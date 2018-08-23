@@ -1,6 +1,7 @@
 package com.example.highrestclienttest.controllers;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.example.highrestclienttest.service.MCFAuthorizer;
+import com.example.highrestclienttest.service.MCFConfigurationParameters;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
@@ -16,10 +17,13 @@ import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.rest.RestStatus;
+import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,14 +35,17 @@ public class userResource {
 
     private RestHighLevelClient client;
     private int id = 1;
+    private final MCFAuthorizer authorizer;
 
 
     public userResource() {
         this.client = new RestHighLevelClient(
-                RestClient.builder(
-                        new HttpHost("localhost", 9200)
-                )
-        );
+                            RestClient.builder(
+                                    new HttpHost("localhost", 9200)
+                            )
+                        );
+        final MCFConfigurationParameters conf = new MCFConfigurationParameters();
+        this.authorizer = new MCFAuthorizer(conf);
     }
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
@@ -99,28 +106,30 @@ public class userResource {
     @GetMapping("/bulk")
     public String insertBulk() throws IOException {
 
+        String indexName = "restbulk2";
+
         BulkRequest bulkRequest = new BulkRequest();
 
         IndexRequest robeszRequest = new IndexRequest(
-                "restbulk",
+                indexName,
                 "doc",
                 "1"
         );
 
         IndexRequest kareszRequest = new IndexRequest(
-                "restbulk",
+                indexName,
                 "doc",
                 "2"
         );
 
         IndexRequest adamRequest = new IndexRequest(
-                "restbulk",
+                indexName,
                 "doc",
                 "3"
         );
 
         IndexRequest zoliRequest = new IndexRequest(
-                "restbulk",
+                indexName,
                 "doc",
                 "4"
         );
@@ -143,7 +152,7 @@ public class userResource {
                 "\"name\":\"Ádám\"," +
                 "\"age\":\"28\"," +
                 "\"hobby\":\"valami saját Ádám hobby\"," +
-                "\"allow_token_parent\":\"Precognox:S-1-5-21-3014129096-3214889382-4178971525-1144\"" +
+                "\"allow_token_parent\":[\"Precognox:S-1-5-21-3014129096-3214889382-4178971525-1144\", \"Precognox:S-1-5-21-3014129096-3214889382-4178971525-500\"]" +
                 "}";
 
         String zoli = "{" +
@@ -199,23 +208,117 @@ public class userResource {
     }
 
 
-    @PostMapping("/search")
-    public SearchResponse search(@RequestBody /*JsonNode*/ String searchRequestObj) throws IOException {
+    @GetMapping("/search")
+    public SearchHits search(@RequestParam(value = "q", defaultValue = "") final String text,
+                             @RequestParam(value = "u", defaultValue = "empty") final String token) throws IOException {
 
-        SearchRequest searchRequest = new SearchRequest("restbulk");
+        System.out.println("A keresett parameter....: " + text);
+        System.out.println("A keresett toke....: " + token);
+        QueryBuilder query = QueryBuilders.boolQuery()
+               /* .should(
+                        QueryBuilders.queryStringQuery(text)
+                        .lenient(true)
+                        .field("name")
+                        .field("hobby")
+                )
+                .should(
+                        QueryBuilders.queryStringQuery("*" + text + "*")
+                        .lenient(true)
+                        .field("name")
+                        .field("hobby")
+                )*/
+                /*.must(
+                        QueryBuilders.termQuery("allow_token_parent", token)
+
+                )*/
+                .must(
+                        QueryBuilders.boolQuery()
+                                .should(
+                                        QueryBuilders.queryStringQuery(text)
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                                .should(
+                                        QueryBuilders.queryStringQuery("*" + text + "*")
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                );
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-/*
-        QueryBuilder query = QueryBuilders.wrapperQuery(searchRequestObj);
-
         searchSourceBuilder.query(query);
-
+        SearchRequest searchRequest = new SearchRequest("restbulk2");
+        searchRequest.types("doc");
         searchRequest.source(searchSourceBuilder);
-        */
 
-        BoolQueryBuilder bool = new BoolQueryBuilder();
-        client.search()
         SearchResponse searchResponse = client.search(searchRequest);
 
-        return searchResponse;
+        RestStatus status = searchResponse.status();
+        TimeValue took = searchResponse.getTook();
+        Boolean terminatedEarly = searchResponse.isTerminatedEarly();
+        boolean timedOut = searchResponse.isTimedOut();
+
+        return searchResponse.getHits();
+
     }
-}
+
+    @GetMapping("/auth/{index}/{type}")
+    public SearchHits auth(@PathVariable final String index,
+                           @PathVariable final String type,
+                           @RequestParam(value = "q", defaultValue = "") final String text,
+                           @RequestParam(value = "u", defaultValue = "empty") final String users) throws IOException {
+        System.out.println("A q= " + text);
+        System.out.println("A u= " + users);
+
+        ////////////////////////////////////////////////
+
+        SearchRequest searchRequest = new SearchRequest(index);
+        searchRequest.types(type);
+
+        //TODOOO: Request elkapása, összes paraméter kell...RestRequest
+        if( users != "" ){
+            String[] authenticatedUserNamesAndDomains = users.split(",");
+        }
+
+
+
+        ////////////////////////////////////////////////
+
+        QueryBuilder query = QueryBuilders.boolQuery()
+
+                .must(
+                        QueryBuilders.termQuery("allow_token_parent", users)//token)
+
+                )
+                .must(
+                        QueryBuilders.boolQuery()
+                                .should(
+                                        QueryBuilders.queryStringQuery(text)
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                                .should(
+                                        QueryBuilders.queryStringQuery("*" + text + "*")
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                );
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(query);
+
+
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = client.search(searchRequest);
+
+        RestStatus status = searchResponse.status();
+        TimeValue took = searchResponse.getTook();
+        Boolean terminatedEarly = searchResponse.isTerminatedEarly();
+        boolean timedOut = searchResponse.isTimedOut();
+        return searchResponse.getHits();
+    }
+
+    }
