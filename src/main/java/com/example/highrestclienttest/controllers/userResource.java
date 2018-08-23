@@ -227,10 +227,10 @@ public class userResource {
                         .field("name")
                         .field("hobby")
                 )*/
-                /*.must(
+                .must(
                         QueryBuilders.termQuery("allow_token_parent", token)
 
-                )*/
+                )
                 .must(
                         QueryBuilders.boolQuery()
                                 .should(
@@ -321,4 +321,4 @@ public class userResource {
         return searchResponse.getHits();
     }
 
-    }
+}

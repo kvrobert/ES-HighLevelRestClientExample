@@ -1,0 +1,20 @@
+{
+  "mappings" : {
+    "record" : {
+      "properties" : {
+        "name" : {
+          "type" : "text"
+        },
+        "age" : {
+          "type" : "text"
+        },
+        "hobby" : {
+          "type": "text"
+        },
+        "allow_token_parent" : {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}
