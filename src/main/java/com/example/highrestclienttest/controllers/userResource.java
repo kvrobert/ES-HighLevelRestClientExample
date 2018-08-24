@@ -18,6 +18,7 @@ import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -287,6 +288,7 @@ public class userResource {
         //TODOOO: Request elkapása, összes paraméter kell...RestRequest
         if( users != "" ){
             String[] authenticatedUserNamesAndDomains = users.split(",");
+            String[] indices = Strings.splitStringByCommaToArray(index);
         }
 
 
@@ -353,17 +355,17 @@ public class userResource {
                         QueryBuilders.boolQuery()
                                 .should(
                                         QueryBuilders.queryStringQuery(text)
-                                                .lenient(true)
+                                                /*.lenient(true)
                                                 .field("name")
                                                 .field("hobby")
-                                                .field("content_text")
+                                                .field("content_text")*/
                                 )
                                 .should(
                                         QueryBuilders.queryStringQuery("*" + text + "*")
-                                                .lenient(true)
+                                                /*.lenient(true)
                                                 .field("name")
                                                 .field("hobby")
-                                                .field("content_text")
+                                                .field("content_text")*/
                                 )
                 )
                 .must(authorizationFilter);
@@ -382,6 +384,7 @@ public class userResource {
         Boolean terminatedEarly = searchResponse.isTerminatedEarly();
         boolean timedOut = searchResponse.isTimedOut();
 
+        //return searchResponse.getHits();
         return searchResponse.getHits();
 
     }
