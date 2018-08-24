@@ -233,10 +233,10 @@ public class userResource {
                         .field("name")
                         .field("hobby")
                 )*/
-                .must(
+                /*.must(
                         QueryBuilders.termQuery("allow_token_parent", token)
 
-                )
+                )*/
                 .must(
                         QueryBuilders.boolQuery()
                                 .should(
@@ -244,18 +244,20 @@ public class userResource {
                                                 .lenient(true)
                                                 .field("name")
                                                 .field("hobby")
+                                                .field("content_text")
                                 )
                                 .should(
                                         QueryBuilders.queryStringQuery("*" + text + "*")
                                                 .lenient(true)
                                                 .field("name")
                                                 .field("hobby")
+                                                .field("content_text")
                                 )
                 );
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(query);
-        SearchRequest searchRequest = new SearchRequest("restbulk2");
-        searchRequest.types("doc");
+        SearchRequest searchRequest = new SearchRequest("manifoldcfauth");
+        searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
 
         SearchResponse searchResponse = client.search(searchRequest);
@@ -329,7 +331,7 @@ public class userResource {
 
 
     @GetMapping("/authtest")
-    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "") final String text,
+    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "*") final String text,
                                @RequestParam(value = "u", defaultValue = "empty") final String users) throws IOException {
 
         final String USERNAME_DOMAIN = users;
@@ -354,12 +356,14 @@ public class userResource {
                                                 .lenient(true)
                                                 .field("name")
                                                 .field("hobby")
+                                                .field("content_text")
                                 )
                                 .should(
                                         QueryBuilders.queryStringQuery("*" + text + "*")
                                                 .lenient(true)
                                                 .field("name")
                                                 .field("hobby")
+                                                .field("content_text")
                                 )
                 )
                 .must(authorizationFilter);
@@ -367,8 +371,8 @@ public class userResource {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(querySearch);
-        SearchRequest searchRequest = new SearchRequest("restbulk2");
-        searchRequest.types("doc");
+        SearchRequest searchRequest = new SearchRequest("manifoldcfauth");
+        searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
 
         SearchResponse searchResponse = client.search(searchRequest);
