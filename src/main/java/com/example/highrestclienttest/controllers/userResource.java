@@ -2,6 +2,7 @@ package com.example.highrestclienttest.controllers;
 
 import com.example.highrestclienttest.service.MCFAuthorizer;
 import com.example.highrestclienttest.service.MCFConfigurationParameters;
+import com.example.highrestclienttest.service.MFCAuthTestService;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
@@ -25,9 +26,11 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/rest/users")
@@ -36,6 +39,9 @@ public class userResource {
     private RestHighLevelClient client;
     private int id = 1;
     private final MCFAuthorizer authorizer;
+
+    @Autowired
+    private  MFCAuthTestService mfcAuthTestService;
 
 
     public userResource() {
@@ -319,6 +325,61 @@ public class userResource {
         Boolean terminatedEarly = searchResponse.isTerminatedEarly();
         boolean timedOut = searchResponse.isTimedOut();
         return searchResponse.getHits();
+    }
+
+
+    @GetMapping("/authtest")
+    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "") final String text,
+                               @RequestParam(value = "u", defaultValue = "empty") final String users) throws IOException {
+
+        final String USERNAME_DOMAIN = users;
+
+        List<String> tokens = mfcAuthTestService.getAllowsTokens(USERNAME_DOMAIN);
+
+        BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
+
+
+        for( String token : tokens ){
+            authorizationFilter.should(
+                    QueryBuilders.termQuery("allow_token_parent", token)
+
+            );
+        }
+
+        QueryBuilder querySearch = QueryBuilders.boolQuery()
+                .must(
+                        QueryBuilders.boolQuery()
+                                .should(
+                                        QueryBuilders.queryStringQuery(text)
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                                .should(
+                                        QueryBuilders.queryStringQuery("*" + text + "*")
+                                                .lenient(true)
+                                                .field("name")
+                                                .field("hobby")
+                                )
+                )
+                .must(authorizationFilter);
+
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(querySearch);
+        SearchRequest searchRequest = new SearchRequest("restbulk2");
+        searchRequest.types("doc");
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = client.search(searchRequest);
+
+        RestStatus status = searchResponse.status();
+        TimeValue took = searchResponse.getTook();
+        Boolean terminatedEarly = searchResponse.isTerminatedEarly();
+        boolean timedOut = searchResponse.isTimedOut();
+
+        return searchResponse.getHits();
+
     }
 
 }

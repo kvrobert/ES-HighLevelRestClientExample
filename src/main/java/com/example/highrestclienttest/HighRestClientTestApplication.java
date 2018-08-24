@@ -1,6 +1,7 @@
 package com.example.highrestclienttest;
 
 import com.example.highrestclienttest.configs.IndexConfiguration;
+import com.example.highrestclienttest.service.MFCAuthTestService;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -28,6 +29,11 @@ public class HighRestClientTestApplication {
     @Bean
     public IndexConfiguration jobIndexConfiguration() {
         return IndexConfiguration.builder().build();
+    }
+
+    @Bean
+    public MFCAuthTestService mfcAuthTestService(){
+        return new MFCAuthTestService();
     }
 
 }
