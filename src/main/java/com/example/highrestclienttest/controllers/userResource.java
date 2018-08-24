@@ -21,9 +21,7 @@ import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.*;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -334,45 +332,52 @@ public class userResource {
 
     @GetMapping("/authtest")
     public SearchHits authTest(@RequestParam(value = "q", defaultValue = "*") final String text,
-                               @RequestParam(value = "u", defaultValue = "empty") final String users) throws IOException {
+                               @RequestParam(value = "u", defaultValue = "empty") final String users,
+                               @RequestParam(value = "df", defaultValue = "") final String df,
+                               @RequestParam(value = "analyzer", defaultValue = "") final String analyzer,
+                               @RequestParam(value = "analyze_wildcard", defaultValue = "false") final Boolean analyze_wildcard,
+                               @RequestParam(value = "lenient", defaultValue = "false") final Boolean lenient,
+                               @RequestParam(value = "default_operator", defaultValue = "") final String default_operator,
+                               @RequestParam(value = "size", defaultValue = "") final String size
+                               ) throws IOException {
 
         final String USERNAME_DOMAIN = users;
+        final String QUERY_STRING = text;
+
 
         List<String> tokens = mfcAuthTestService.getAllowsTokens(USERNAME_DOMAIN);
 
         BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
-
 
         for( String token : tokens ){
             authorizationFilter.should(
                     QueryBuilders.termQuery("allow_token_parent", token)
 
             );
+            System.out.println(token);
         }
 
-        QueryBuilder querySearch = QueryBuilders.boolQuery()
-                .must(
-                        QueryBuilders.boolQuery()
-                                .should(
-                                        QueryBuilders.queryStringQuery(text)
-                                                /*.lenient(true)
-                                                .field("name")
-                                                .field("hobby")
-                                                .field("content_text")*/
-                                )
-                                .should(
-                                        QueryBuilders.queryStringQuery("*" + text + "*")
-                                                /*.lenient(true)
-                                                .field("name")
-                                                .field("hobby")
-                                                .field("content_text")*/
-                                )
-                )
-                .must(authorizationFilter);
+        QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(QUERY_STRING);
 
+        if(!df.equals(""))  from.defaultField(df);
+        if(!analyzer.equals("")) from.analyzer(analyzer);
+        if(Boolean.valueOf(analyze_wildcard)) from.analyzeWildcard(Boolean.valueOf(analyze_wildcard));
+        if(Boolean.valueOf(lenient)) from.lenient(Boolean.valueOf(lenient));
+        if(!default_operator.equals("")){
+            if(default_operator.equals("OR")){
+                from.defaultOperator(Operator.OR);
+            }else if( default_operator.equals("AND")){
+                from.defaultOperator(Operator.AND);
+            }else{
+                throw new IllegalArgumentException("Unsupported defaultOperator [" + default_operator + "], can either be [OR] or [AND]");
+            }
+        }
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(querySearch);
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                .must(from)
+                .must(authorizationFilter)
+        );
         SearchRequest searchRequest = new SearchRequest("manifoldcfauth");
         searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
