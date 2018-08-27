@@ -1,7 +1,12 @@
 package com.example.highrestclienttest.service;
 
+import com.example.highrestclienttest.configs.MCFConfigurationParameters;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.TermQueryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -15,14 +20,40 @@ import java.util.List;
 @Service
 public class MFCAuthTestService {
 
+    @Autowired
+    MCFConfigurationParameters mcfConfigurationParameters;
+
     private static final Logger LOG = LoggerFactory.getLogger(MFCAuthTestService.class);
-    private String BASE_URL = "http://localhost:8345/mcf-authority-service";
+    private static final String NOSECURITY_TOKEN = "__nosecurity__";
+
+    private String authorityBaseURL;
+    private String fieldAllowDocument;
+    private String fieldDenyDocument;
+    private String fieldAllowParent;
+    private String fieldDenyParent;
+    private String fieldAllowShare;
+    private String fieldDenyShare;
 
 
+
+    public BoolQueryBuilder getAuthFilter(String userDomain) throws IOException {
+        initConfigParameters();
+        return (BoolQueryBuilder) buildAuthorizationFilter(userDomain);
+    }
+
+    public void initConfigParameters(){
+        authorityBaseURL = mcfConfigurationParameters.getAuthorityServiceBaseURL();
+        fieldAllowDocument = mcfConfigurationParameters.getAllowFieldPrefix() + "document";
+        fieldDenyDocument = mcfConfigurationParameters.getDenyFieldPrefix() + "document";
+        fieldAllowShare = mcfConfigurationParameters.getAllowFieldPrefix() + "share";
+        fieldDenyShare = mcfConfigurationParameters.getDenyFieldPrefix() + "share";
+        fieldAllowParent = mcfConfigurationParameters.getAllowFieldPrefix() + "parent";
+        fieldDenyParent = mcfConfigurationParameters.getDenyFieldPrefix() + "parent";
+    }
 
     public List<String> getAllowsTokens(String domain) throws IOException {
-
-        StringBuilder urlBuffer = new StringBuilder(BASE_URL);
+        authorityBaseURL = mcfConfigurationParameters.getAuthorityServiceBaseURL();
+        StringBuilder urlBuffer = new StringBuilder(authorityBaseURL);
         urlBuffer.append("/UserACLs");
 
         // ha az érkezett domain nev > 0, akkor hibás legyen, csak 1 userrel dolgozunk
@@ -69,5 +100,70 @@ public class MFCAuthTestService {
         return tokenList;
     }
 
+
+    /** Main method for building a filter representing appropriate security.
+     **@return the wrapped query enforcing ManifoldCF security.
+     */
+    public QueryBuilder buildAuthorizationFilter(String userDomain)
+            throws MCFAuthorizerException, IOException {
+
+        BoolQueryBuilder bq = new BoolQueryBuilder();
+        List<String> userAccessTokens = getAllowsTokens(userDomain);
+
+        QueryBuilder allowShareOpen = new TermQueryBuilder(fieldAllowShare,NOSECURITY_TOKEN);
+        QueryBuilder denyShareOpen = new TermQueryBuilder(fieldDenyShare,NOSECURITY_TOKEN);
+        QueryBuilder allowParentOpen = new TermQueryBuilder(fieldAllowParent,NOSECURITY_TOKEN);
+        QueryBuilder denyParentOpen = new TermQueryBuilder(fieldDenyParent,NOSECURITY_TOKEN);
+        QueryBuilder allowDocumentOpen = new TermQueryBuilder(fieldAllowDocument,NOSECURITY_TOKEN);
+        QueryBuilder denyDocumentOpen = new TermQueryBuilder(fieldDenyDocument,NOSECURITY_TOKEN);
+
+        if (userAccessTokens == null || userAccessTokens.size() == 0)
+        {
+            // Only open documents can be included.
+            // That query is:
+            // (fieldAllowShare is empty AND fieldDenyShare is empty AND fieldAllowDocument is empty AND fieldDenyDocument is empty)
+            // We're trying to map to:  -(fieldAllowShare:*) , which should be pretty efficient in Solr because it is negated.  If this turns out not to be so, then we should
+            // have the SolrConnector inject a special token into these fields when they otherwise would be empty, and we can trivially match on that token.
+            bq.must(allowShareOpen);
+            bq.must(denyShareOpen);
+            bq.must(allowParentOpen);
+            bq.must(denyParentOpen);
+            bq.must(allowDocumentOpen);
+            bq.must(denyDocumentOpen);
+        }
+        else
+        {
+            // Extend the query appropriately for each user access token.
+            bq.must(calculateCompleteSubquery(fieldAllowShare,fieldDenyShare,allowShareOpen,denyShareOpen,userAccessTokens));
+            bq.must(calculateCompleteSubquery(fieldAllowDocument,fieldDenyDocument,allowDocumentOpen,denyDocumentOpen,userAccessTokens));
+            bq.must(calculateCompleteSubquery(fieldAllowParent,fieldDenyParent,allowParentOpen,denyParentOpen,userAccessTokens));
+        }
+
+        return bq;
+    }
+
+
+    /** Calculate a complete subclause, representing something like:
+     * ((fieldAllowShare is empty AND fieldDenyShare is empty) OR fieldAllowShare HAS token1 OR fieldAllowShare HAS token2 ...)
+     *     AND fieldDenyShare DOESN'T_HAVE token1 AND fieldDenyShare DOESN'T_HAVE token2 ...
+     */
+    protected static QueryBuilder calculateCompleteSubquery(String allowField, String denyField, QueryBuilder allowOpen, QueryBuilder denyOpen, List<String> userAccessTokens)
+    {
+        BoolQueryBuilder bq = new BoolQueryBuilder();
+        // No ES equivalent - hope this is done right inside
+        //bq.setMaxClauseCount(1000000);
+
+        // Add the empty-acl case
+        BoolQueryBuilder subUnprotectedClause = new BoolQueryBuilder();
+        subUnprotectedClause.must(allowOpen);
+        subUnprotectedClause.must(denyOpen);
+        bq.should(subUnprotectedClause);
+        for (String accessToken : userAccessTokens)
+        {
+            bq.should(new TermQueryBuilder(allowField,accessToken));
+            bq.mustNot(new TermQueryBuilder(denyField,accessToken));
+        }
+        return bq;
+    }
 
 }

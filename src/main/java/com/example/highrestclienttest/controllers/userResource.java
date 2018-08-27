@@ -337,16 +337,17 @@ public class userResource {
 
         List<String> tokens = mfcAuthTestService.getAllowsTokens(USERNAME_DOMAIN);
 
-        BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
+        //BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
+        BoolQueryBuilder authorizationFilter = mfcAuthTestService.getAuthFilter(USERNAME_DOMAIN);
 
-        for( String token : tokens ){
+        /*for( String token : tokens ){
             authorizationFilter.should(
                     QueryBuilders.termQuery("allow_token_parent", token)
 
             );
             System.out.println(token);
         }
-
+*/
         QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(QUERY_STRING);
 
         if(!df.equals(""))  from.defaultField(df);

@@ -31,32 +31,26 @@ import lombok.Value;
 public class MCFConfigurationParameters
 {
   /** Base URL, e.g. "http://localhost:8345/mcf-authority-service" */
-  @Getter
   @Builder.Default
   String authorityServiceBaseURL = "http://localhost:8345/mcf-authority-service";
 
   /** Connection timeout, e.g. 60000 */
-  @Getter
   @Builder.Default
   int connectionTimeout = 60000;
 
   /** Socket timeout, e.g. 300000 */
-  @Getter
   @Builder.Default
   int socketTimeout = 300000;
 
   /** Allow field prefix, e.g. "allow_token_" */
-  @Getter
   @Builder.Default
   String allowFieldPrefix = "allow_token_";
 
   /** Deny field prefix, e.g. "deny_token_" */
-  @Getter
   @Builder.Default
   String denyFieldPrefix = "deny_token_";
 
   /** Connection pool size, e.g. 50 */
-  @Getter
   @Builder.Default
   int connectionPoolSize = 50;
 
