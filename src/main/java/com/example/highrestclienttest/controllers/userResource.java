@@ -1,7 +1,6 @@
 package com.example.highrestclienttest.controllers;
 
-import com.example.highrestclienttest.service.MCFAuthorizer;
-import com.example.highrestclienttest.service.MCFConfigurationParameters;
+
 import com.example.highrestclienttest.service.MFCAuthTestService;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.DocWriteRequest;
@@ -35,23 +34,14 @@ import java.util.List;
 @RequestMapping("/rest/users")
 public class userResource {
 
+    @Autowired
     private RestHighLevelClient client;
     private int id = 1;
-    private final MCFAuthorizer authorizer;
+
 
     @Autowired
     private  MFCAuthTestService mfcAuthTestService;
 
-
-    public userResource() {
-        this.client = new RestHighLevelClient(
-                            RestClient.builder(
-                                    new HttpHost("localhost", 9200)
-                            )
-                        );
-        final MCFConfigurationParameters conf = new MCFConfigurationParameters();
-        this.authorizer = new MCFAuthorizer(conf);
-    }
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
     public String insert(@PathVariable final String name, @PathVariable final String age, @PathVariable final String hobby) throws IOException {
@@ -378,6 +368,11 @@ public class userResource {
                 .must(from)
                 .must(authorizationFilter)
         );
+
+        if(!size.equals("")) {
+            searchSourceBuilder.size(Integer.parseInt(size));
+        }
+
         SearchRequest searchRequest = new SearchRequest("manifoldcfauth");
         searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
