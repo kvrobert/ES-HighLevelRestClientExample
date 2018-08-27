@@ -1,5 +1,6 @@
 package com.example.highrestclienttest.service;
 
+import com.example.highrestclienttest.Exceptions.MCFAuthorizerException;
 import com.example.highrestclienttest.configs.MCFConfigurationParameters;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
@@ -18,12 +19,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class MFCAuthTestService {
+public class MFCAuthService {
 
     @Autowired
     MCFConfigurationParameters mcfConfigurationParameters;
 
-    private static final Logger LOG = LoggerFactory.getLogger(MFCAuthTestService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MFCAuthService.class);
     private static final String NOSECURITY_TOKEN = "__nosecurity__";
 
     private String authorityBaseURL;

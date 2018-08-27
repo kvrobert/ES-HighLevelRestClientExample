@@ -1,8 +1,8 @@
 package com.example.highrestclienttest.controllers;
 
 
-import com.example.highrestclienttest.service.MFCAuthTestService;
-import org.apache.http.HttpHost;
+import com.example.highrestclienttest.service.KeycloakService;
+import com.example.highrestclienttest.service.MFCAuthService;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -15,8 +15,8 @@ import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateResponse;
-import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
@@ -28,7 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.List;
 
 @RestController
 @RequestMapping("/rest/users")
@@ -40,7 +39,10 @@ public class userResource {
 
 
     @Autowired
-    private  MFCAuthTestService mfcAuthTestService;
+    private MFCAuthService mfcAuthService;
+
+    @Autowired
+    private KeycloakService keycloakService;
 
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
@@ -321,26 +323,34 @@ public class userResource {
 
 
     @GetMapping("/authtest")
-    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "*") final String text,
-                               @RequestParam(value = "u", defaultValue = "empty") final String users,
+    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "*") final String QUERY_STRING,
+                               @RequestParam(value = "u", defaultValue = "empty") final String USERS,
                                @RequestParam(value = "df", defaultValue = "") final String df,
                                @RequestParam(value = "analyzer", defaultValue = "") final String analyzer,
                                @RequestParam(value = "analyze_wildcard", defaultValue = "false") final Boolean analyze_wildcard,
                                @RequestParam(value = "lenient", defaultValue = "false") final Boolean lenient,
                                @RequestParam(value = "default_operator", defaultValue = "") final String default_operator,
-                               @RequestParam(value = "size", defaultValue = "") final String size
+                               @RequestParam(value = "size", defaultValue = "") final String size,
+                               @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN // MÉG LEHET NULL, de később nem!!!
                                ) throws IOException {
 
-        final String USERNAME_DOMAIN = users;
-        final String QUERY_STRING = text;
+        final String USERNAME_DOMAIN;
 
+        if(KEYCLOAK_ACCESS_TOKEN != null){
+            USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
+        }else {
+            USERNAME_DOMAIN = USERS;
+        }
+        System.out.println(KEYCLOAK_ACCESS_TOKEN);
+        BoolQueryBuilder authorizationFilter = mfcAuthService.getAuthFilter(USERNAME_DOMAIN);
 
+        /*
         List<String> tokens = mfcAuthTestService.getAllowsTokens(USERNAME_DOMAIN);
 
         //BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
-        BoolQueryBuilder authorizationFilter = mfcAuthTestService.getAuthFilter(USERNAME_DOMAIN);
 
-        /*for( String token : tokens ){
+
+        for( String token : tokens ){
             authorizationFilter.should(
                     QueryBuilders.termQuery("allow_token_parent", token)
 
