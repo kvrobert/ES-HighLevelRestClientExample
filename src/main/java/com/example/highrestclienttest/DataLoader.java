@@ -33,4 +33,5 @@ public class DataLoader implements CommandLineRunner {
         elasticSearchService.createRecord(robesz);
     }
 
+
 }
