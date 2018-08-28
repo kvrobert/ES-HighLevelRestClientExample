@@ -1,0 +1,370 @@
+{
+  "properties": {
+    "Application-Name": {
+      "type": "text"
+    },
+    "Application-Version": {
+      "type": "text"
+    },
+    "Author": {
+      "type": "text"
+    },
+    "Character Count": {
+      "type": "integer"
+    },
+    "Character-Count-With-Spaces": {
+      "type": "integer"
+    },
+    "Company": {
+      "type": "text"
+    },
+    "Content-Encoding": {
+      "type": "text"
+    },
+    "Content-Type": {
+      "type": "text"
+    },
+    "Content-Type-Hint": {
+      "type": "text"
+    },
+    "Creation-Date": {
+      "type": "date"
+    },
+    "ENTITY:IDENTIFIER:PHONE_NUMBER": {
+      "type": "text"
+    },
+    "ENTITY:IDENTIFIER:URL": {
+      "type": "text"
+    },
+    "ENTITY:LOCATION": {
+      "type": "text"
+    },
+    "ENTITY:NATIONALITY": {
+      "type": "text"
+    },
+    "ENTITY:ORGANIZATION": {
+      "type": "text"
+    },
+    "ENTITY:PERSON": {
+      "type": "text"
+    },
+    "ENTITY:PRODUCT": {
+      "type": "text"
+    },
+    "ENTITY:TITLE": {
+      "type": "text"
+    },
+    "Edit-Time": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "Generator": {
+      "type": "text"
+    },
+    "Keywords": {
+      "type": "text"
+    },
+    "Last-Author": {
+      "type": "text"
+    },
+    "Last-Modified": {
+      "type": "date"
+    },
+    "Last-Printed": {
+      "type": "date"
+    },
+    "Last-Save-Date": {
+      "type": "date"
+    },
+    "Line-Count": {
+      "type": "integer"
+    },
+    "Originator": {
+      "type": "text"
+    },
+    "Page-Count": {
+      "type": "integer"
+    },
+    "Paragraph-Count": {
+      "type": "integer"
+    },
+    "ProgId": {
+      "type": "keyword"
+    },
+    "Revision-Number": {
+      "type": "integer"
+    },
+    "Template": {
+      "type": "keyword"
+    },
+    "Total-Time": {
+      "type": "date"
+    },
+    "Word-Count": {
+      "type": "integer"
+    },
+    "X-Parsed-By": {
+      "type": "text"
+    },
+    "access_permission:assemble_document": {
+      "type": "boolean"
+    },
+    "access_permission:can_modify": {
+      "type": "boolean"
+    },
+    "access_permission:can_print": {
+      "type": "boolean"
+    },
+    "access_permission:can_print_degraded": {
+      "type": "boolean"
+    },
+    "access_permission:extract_content": {
+      "type": "boolean"
+    },
+    "access_permission:extract_for_accessibility": {
+      "type": "boolean"
+    },
+    "access_permission:fill_in_form": {
+      "type": "boolean"
+    },
+    "access_permission:modify_annotations": {
+      "type": "boolean"
+    },
+    "allow_token_document": {
+      "type": "keyword"
+    },
+    "allow_token_parent": {
+      "type": "keyword"
+    },
+    "allow_token_share": {
+      "type": "keyword"
+    },
+    "attributes": {
+      "type": "integer"
+    },
+    "content_text": {
+      "type": "text"
+    },
+    "cp:revision": {
+      "type": "integer"
+    },
+    "cp:subject": {
+      "type": "text"
+    },
+    "created": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "createdOn": {
+      "type": "text"
+    },
+    "creator": {
+      "type": "text"
+    },
+    "custom:_DocHome": {
+      "type": "text"
+    },
+    "date": {
+      "type": "date"
+    },
+    "dc:format": {
+      "type": "text"
+    },
+    "dc:publisher": {
+      "type": "text"
+    },
+    "dc:subject": {
+      "type": "text"
+    },
+    "dc:title": {
+      "type": "text"
+    },
+    "dcterms:created": {
+      "type": "date"
+    },
+    "dcterms:modified": {
+      "type": "date"
+    },
+    "deny_token_document": {
+      "type": "keyword"
+    },
+    "deny_token_parent": {
+      "type": "keyword"
+    },
+    "deny_token_share": {
+      "type": "keyword"
+    },
+    "editing-cycles": {
+      "type": "integer"
+    },
+    "extended-properties:AppVersion": {
+      "type": "text"
+    },
+    "extended-properties:Application": {
+      "type": "text"
+    },
+    "extended-properties:Company": {
+      "type": "text"
+    },
+    "extended-properties:DocSecurity": {
+      "type": "text"
+    },
+    "extended-properties:Template": {
+      "type": "text"
+    },
+    "extended-properties:TotalTime": {
+      "type": "integer"
+    },
+    "fileCreatedOn": {
+      "type": "date"
+    },
+    "generator": {
+      "type": "text"
+    },
+    "initial-creator": {
+      "type": "text"
+    },
+    "lastModified": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "meta:character-count": {
+      "type": "integer"
+    },
+    "meta:character-count-with-spaces": {
+      "type": "integer"
+    },
+    "meta:creation-date": {
+      "type": "date"
+    },
+    "meta:initial-author": {
+      "type": "text"
+    },
+    "meta:keyword": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "meta:last-author": {
+      "type": "text"
+    },
+    "meta:line-count": {
+      "type": "integer"
+    },
+    "meta:paragraph-count": {
+      "type": "integer"
+    },
+    "meta:print-date": {
+      "type": "date"
+    },
+    "meta:save-date": {
+      "type": "date"
+    },
+    "meta:word-count": {
+      "type": "integer"
+    },
+    "meta_author": {
+      "type": "text"
+    },
+    "meta_page-count": {
+      "type": "integer"
+    },
+    "modified": {
+      "type": "date"
+    },
+    "nbCharacter": {
+      "type": "integer"
+    },
+    "nbPage": {
+      "type": "integer"
+    },
+    "nbPara": {
+      "type": "integer"
+    },
+    "nbWord": {
+      "type": "integer"
+    },
+    "pdf:PDFVersion": {
+      "type": "text"
+    },
+    "pdf:docinfo:created": {
+      "type": "date"
+    },
+    "pdf:docinfo:creator": {
+      "type": "text"
+    },
+    "pdf:docinfo:creator_tool": {
+      "type": "text"
+    },
+    "pdf:docinfo:modified": {
+      "type": "date"
+    },
+    "pdf:docinfo:producer": {
+      "type": "text"
+    },
+    "pdf:docinfo:title": {
+      "type": "text"
+    },
+    "pdf:encrypted": {
+      "type": "text"
+    },
+    "producer": {
+      "type": "text"
+    },
+    "protected": {
+      "type": "text"
+    },
+    "publisher": {
+      "type": "text"
+    },
+    "resourceName": {
+      "type": "text"
+    },
+    "shareName": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "stream_name": {
+      "type": "text"
+    },
+    "stream_size": {
+      "type": "integer"
+    },
+    "subject": {
+      "type": "text"
+    },
+    "title": {
+      "type": "text"
+    },
+    "xmp:CreatorTool": {
+      "type": "text"
+    },
+    "xmpTPg:NPages": {
+      "type": "text"
+    }
+  }
+}
