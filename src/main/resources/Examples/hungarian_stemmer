@@ -1,0 +1,53 @@
+PUT my_index
+
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "std_english": {
+          "type":      "standard",
+          "stopwords": "_english_"
+        },
+        "my_analyzer" : {
+                            "tokenizer" : "standard",
+                            "filter" : ["standard", "lowercase", "my_stemmer"]
+                        }
+      },
+      "filter" : {
+                      "my_stemmer" : {
+                          "type" : "stemmer",
+                          "name" : "hungarian"
+                      }
+                  }
+    }
+  },
+  "mappings": {
+    "_doc": {
+      "properties": {
+        "my_text": {
+          "type":     "text",
+          "analyzer": "standard",
+          "fields": {
+            "english": {
+              "type":     "text",
+              "analyzer": "std_english"
+            },
+            "hungary": {
+                          "type":     "text",
+                          "analyzer": "my_analizer"
+                        }
+
+          }
+        }
+      }
+    }
+  }
+}
+
+
+
+POST http://localhost:9200/my_index/_analyze
+{
+  "field": "my_text.hungary",
+  "text": "A jó öreg barna medvék viadalai menekülésbe mentek."
+}

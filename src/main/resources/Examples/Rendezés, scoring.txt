@@ -1,0 +1,35 @@
+{
+    "sort" : [
+        { "Author.keyword" : {"order" : "desc"}},
+        "_score"
+    ],
+    "_source": [ "Author" ],
+    "explain": true,  // MAGYARÁZAT A SCORE SZÁMÍTÁSÁRA
+    "query" : {
+        "term" : { "content_text" : "gépjármű" }
+    }
+
+}
+
+************************************************************
+
+BOOSTING, SCORIN  - positive boost with CONSTANS SCORING-BOOSTING
+
+{
+    "query": {
+        "boosting" : {
+            "positive" : {
+                "term" : {
+                    "content_text" : "gépjármű"
+                }
+            },
+            "negative" : {
+                 "term" : {
+                     "Author" : "horvath.zoltan"
+                }
+            },
+            "negative_boost" : 0.2
+        }
+    },
+    "_source": [ "Author", "content_text" ]
+}
