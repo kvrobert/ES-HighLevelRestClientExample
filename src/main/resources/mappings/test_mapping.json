@@ -3,7 +3,7 @@
     "record" : {
       "properties" : {
         "name" : {
-          "type" : "text"
+          "type" : "rni_name"
         },
         "age" : {
           "type" : "text"

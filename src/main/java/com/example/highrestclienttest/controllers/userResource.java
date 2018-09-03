@@ -336,6 +336,8 @@ public class userResource {
 
         final String USERNAME_DOMAIN;
 
+        System.out.println("Q=" + QUERY_STRING);
+
         if(KEYCLOAK_ACCESS_TOKEN != null){
             USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
         }else {
@@ -344,20 +346,6 @@ public class userResource {
         System.out.println(KEYCLOAK_ACCESS_TOKEN);
         BoolQueryBuilder authorizationFilter = mfcAuthService.getAuthFilter(USERNAME_DOMAIN);
 
-        /*
-        List<String> tokens = mfcAuthTestService.getAllowsTokens(USERNAME_DOMAIN);
-
-        //BoolQueryBuilder authorizationFilter = new BoolQueryBuilder();
-
-
-        for( String token : tokens ){
-            authorizationFilter.should(
-                    QueryBuilders.termQuery("allow_token_parent", token)
-
-            );
-            System.out.println(token);
-        }
-*/
         QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(QUERY_STRING);
 
         if(!df.equals(""))  from.defaultField(df);
@@ -384,7 +372,7 @@ public class userResource {
             searchSourceBuilder.size(Integer.parseInt(size));
         }
 
-        SearchRequest searchRequest = new SearchRequest("manifoldcfauth");
+        SearchRequest searchRequest = new SearchRequest("testrni");
         searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
 

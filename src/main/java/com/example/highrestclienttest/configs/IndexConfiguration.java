@@ -13,4 +13,9 @@ public class IndexConfiguration {
 
     @Builder.Default
     String type = "record";
+
+    @Builder.Default
+    String nameField = "name";  // Az RNI miatt tettük már hozzá
+
+
 }

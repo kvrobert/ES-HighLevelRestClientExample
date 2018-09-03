@@ -18,7 +18,7 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        initializeData();
+        //initializeData();  // így nem hozza létre minden indításnál a Robeszt
     }
 
     private void initializeData() throws IOException {

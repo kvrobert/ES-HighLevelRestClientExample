@@ -1,5 +1,7 @@
 package com.example.highrestclienttest.service;
 
+import com.basistech.names.parameters.*;
+import com.basistech.rni.es.DocScoreFunctionBuilder;
 import com.example.highrestclienttest.beans.TestData;
 import com.example.highrestclienttest.configs.IndexConfiguration;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -14,13 +16,16 @@ import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.io.Streams;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.rescore.QueryRescorerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -82,6 +87,43 @@ public class ElasticSearchService {
 
     }
 
+    public SearchResponse simpleSearch(String q) throws IOException {
+
+        //Search Elasticsearch using the RNI rescorer
+        BoolQueryBuilder boolQuery = new BoolQueryBuilder();
+        DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
+
+        boolQuery.should(
+                QueryBuilders.matchQuery(
+                        indexConfiguration.getNameField(),
+                        q
+                )
+        );
+
+        docScorer.queryField(indexConfiguration.getNameField(), q);
+
+        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
+                new FunctionScoreQueryBuilder(docScorer)
+
+        );
+
+
+        queryRescorer = setRNIValuesForRescore(queryRescorer);
+
+        SearchRequest searchRequest = new SearchRequest(indexConfiguration.getIndexName());
+        searchRequest.types(indexConfiguration.getType())
+                .searchType(SearchType.DFS_QUERY_THEN_FETCH)
+                .source(new SearchSourceBuilder().query(boolQuery).size(20)
+                        .addRescorer(queryRescorer));
+
+        return client.search(searchRequest);
+
+    }
+
+    private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
+        return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
+    }
+
     public SearchResponse advancedSearch(Map<String, String> params) throws IOException {
         BoolQueryBuilder boolQuery = new BoolQueryBuilder();
 
@@ -92,7 +134,6 @@ public class ElasticSearchService {
         SearchRequest searchRequest = new SearchRequest(indexConfiguration.getIndexName());
         searchRequest.types(indexConfiguration.getType())
                 .source(new SearchSourceBuilder().query(boolQuery));
-
         return client.search(searchRequest);
     }
 }

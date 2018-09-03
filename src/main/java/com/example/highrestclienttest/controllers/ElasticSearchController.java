@@ -1,6 +1,7 @@
 package com.example.highrestclienttest.controllers;
 
 import com.example.highrestclienttest.service.ElasticSearchService;
+import jdk.nashorn.internal.objects.annotations.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,6 +26,11 @@ public class ElasticSearchController {
     @PostMapping(produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     private ResponseEntity advancedSearch(@RequestBody Map<String, String> params) throws IOException {
         return new ResponseEntity<>(elasticSearchService.advancedSearch(params).getHits(), HttpStatus.OK);
+    }
+
+    @GetMapping(produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    private ResponseEntity simpleSearch(@RequestParam(value = "q") String q) throws IOException {
+        return new ResponseEntity<>(elasticSearchService.simpleSearch(q).getHits(), HttpStatus.OK);
     }
 
 }

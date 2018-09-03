@@ -60,6 +60,42 @@
             <version>1.16.20</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.basistech.rni.es</groupId>
+            <artifactId>rni-es-plugin</artifactId>
+            <version>6.2.4.0</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+            <version>59.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.basistech</groupId>
+            <artifactId>common-api</artifactId>
+            <version>36.1.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.basistech</groupId>
+            <artifactId>common-api-jackson</artifactId>
+            <version>36.1.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.basistech</groupId>
+            <artifactId>common-lib</artifactId>
+            <version>37.1.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.basistech</groupId>
+            <artifactId>rlpnc</artifactId>
+            <version>1.1.1</version>
+        </dependency>
 
     </dependencies>
 
