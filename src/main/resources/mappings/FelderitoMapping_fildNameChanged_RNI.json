@@ -130,13 +130,19 @@
             }
           },
           "ENTITY:PERSON": {
-            "type": "rni_name",
+            "type": "text",
+            "copy_to": "RNI_PERSON",
             "fields": {
               "keyword": {
                 "type": "keyword",
                 "ignore_above": 256
               }
             }
+          },
+          "RNI_PERSON": {
+            "type": "rni_name",
+            "index": true,
+            "store": true
           },
           "ENTITY:PRODUCT": {
             "type": "text",
