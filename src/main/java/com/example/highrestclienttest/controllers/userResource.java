@@ -1,6 +1,7 @@
 package com.example.highrestclienttest.controllers;
 
 
+import com.basistech.rni.es.DocScoreFunctionBuilder;
 import com.example.highrestclienttest.service.KeycloakService;
 import com.example.highrestclienttest.service.MFCAuthService;
 import org.elasticsearch.action.DocWriteRequest;
@@ -13,6 +14,7 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -21,9 +23,11 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.*;
+import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.rescore.QueryRescorerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -386,6 +390,56 @@ public class userResource {
         //return searchResponse.getHits();
         return searchResponse.getHits();
 
+    }
+
+    @GetMapping("/rniauth")
+    public SearchHits rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
+                                  @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
+
+
+        final String FIELD_NAME = "RNI_PERSON"; // Copy field
+        final String INDEX_NAME = "testrni";
+        final String INDEX_TYPE = "attachment";
+
+        System.out.println("Params: " + q + " - " + USERS);
+
+        BoolQueryBuilder authorizationFilter = mfcAuthService.getAuthFilter(USERS);
+
+        BoolQueryBuilder boolQuery = new BoolQueryBuilder();
+        DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
+
+        boolQuery.must( // Muszáj, hogy MUST legyen az összetett keresési feltétel miatt....
+                QueryBuilders.matchQuery(
+                        FIELD_NAME,
+                        q
+                )
+        ).must(authorizationFilter);
+
+        docScorer.queryField(FIELD_NAME, q);
+
+        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
+                new FunctionScoreQueryBuilder(docScorer)
+
+        );
+
+        queryRescorer = setRNIValuesForRescore(queryRescorer);
+
+
+        SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+        searchRequest.types(INDEX_TYPE)
+                .searchType(SearchType.DFS_QUERY_THEN_FETCH)
+                .source(new SearchSourceBuilder().query(boolQuery).size(20)
+                        .addRescorer(queryRescorer));
+
+
+
+        return client.search(searchRequest).getHits();
+    }
+
+
+    // Ezek a szükséges RNI default értékek... játszani velük, haminden jól megy már...
+    private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
+        return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
     }
 
 }
