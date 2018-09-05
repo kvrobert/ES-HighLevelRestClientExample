@@ -1,9 +1,10 @@
 package com.example.highrestclienttest.controllers;
 
-
-import com.basistech.rni.es.DocScoreFunctionBuilder;
-import com.example.highrestclienttest.service.KeycloakService;
-import com.example.highrestclienttest.service.MCFAuthService;
+import com.example.highrestclienttest.service.MCFSearchService;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -14,7 +15,6 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.action.support.replication.ReplicationResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -22,20 +22,17 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.query.*;
-import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
-import org.elasticsearch.search.rescore.QueryRescorerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/rest/users")
@@ -45,13 +42,50 @@ public class userResource {
     private RestHighLevelClient client;
     private int id = 1;
 
-
     @Autowired
-    private MCFAuthService MCFAuthService;
+    private MCFSearchService mcfSearchService;
 
-    @Autowired
-    private KeycloakService keycloakService;
 
+    /**
+     * Simple query string search with Faceting, Highlighting, for authentication (u= user@domain.com) or JWT token
+     * @param params default ES Query params and "u" for user domain
+     * @param KEYCLOAK_ACCESS_TOKEN from header
+     * @return respons as String... not works correctly
+     * @throws IOException
+     */
+    @GetMapping(value = "/authtest")
+    public String authTest(@RequestParam Map<String, String> params,
+                           @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN // MÉG LEHET NULL, de később nem!!!
+                            ) throws IOException {
+
+        params.put("KEYCLOAK_ACCESS_TOKEN", KEYCLOAK_ACCESS_TOKEN);
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        Object obj = mcfSearchService.simpleSearchTest(params);
+
+        return obj.toString();
+
+        //return new ResponseEntity<>( obj, HttpStatus.OK);
+        //return mcfSearchService.simpleSearchTest(params);
+
+
+    }
+
+    @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public String rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
+                          @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
+
+        // TODO.... not works as OBJ... exc because of ENTITY can not be convert to JSON....
+        return mcfSearchService.simpleSearchRNI(q, USERS);
+    }
+
+
+
+
+    /* *********************************************************************************************************** */
+    /* *********************************************************************************************************** */
+    /* *********************************************************************************************************** */
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
     public String insert(@PathVariable final String name,
@@ -329,195 +363,6 @@ public class userResource {
         Boolean terminatedEarly = searchResponse.isTerminatedEarly();
         boolean timedOut = searchResponse.isTimedOut();
         return searchResponse.getHits();
-    }
-
-
-    @GetMapping("/authtest")
-    public String authTest(@RequestParam(value = "q", defaultValue = "*") final String QUERY_STRING,
-                               @RequestParam(value = "u", defaultValue = "empty") final String USERS,
-                               @RequestParam(value = "df", defaultValue = "") final String df,
-                               @RequestParam(value = "analyzer", defaultValue = "") final String analyzer,
-                               @RequestParam(value = "analyze_wildcard", defaultValue = "false") final Boolean analyze_wildcard,
-                               @RequestParam(value = "lenient", defaultValue = "false") final Boolean lenient,
-                               @RequestParam(value = "default_operator", defaultValue = "") final String default_operator,
-                               @RequestParam(value = "size", defaultValue = "") final String size,
-                               @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN // MÉG LEHET NULL, de később nem!!!
-                               ) throws IOException {
-
-        final String USERNAME_DOMAIN;
-
-        System.out.println("Q=" + QUERY_STRING);
-
-        if(KEYCLOAK_ACCESS_TOKEN != null){
-            USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
-        }else {
-            USERNAME_DOMAIN = USERS;
-        }
-        System.out.println(KEYCLOAK_ACCESS_TOKEN);
-        BoolQueryBuilder authorizationFilter = MCFAuthService.getAuthFilter(USERNAME_DOMAIN);
-
-        QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(QUERY_STRING);
-
-        if(!df.equals(""))  from.defaultField(df);
-        if(!analyzer.equals("")) from.analyzer(analyzer);
-        if(Boolean.valueOf(analyze_wildcard)) from.analyzeWildcard(Boolean.valueOf(analyze_wildcard));
-        if(Boolean.valueOf(lenient)) from.lenient(Boolean.valueOf(lenient));
-        if(!default_operator.equals("")){
-            if(default_operator.equals("OR")){
-                from.defaultOperator(Operator.OR);
-            }else if( default_operator.equals("AND")){
-                from.defaultOperator(Operator.AND);
-            }else{
-                throw new IllegalArgumentException("Unsupported defaultOperator [" + default_operator + "], can either be [OR] or [AND]");
-            }
-        }
-
-        HighlightBuilder highlightBuilder = new HighlightBuilder();
-        HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
-
-        highlightBuilder.field(highlightPerson);
-
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
-                .must(from)
-                .must(authorizationFilter)
-        ).highlighter(highlightBuilder);
-
-        if(!size.equals("")) {
-            searchSourceBuilder.size(Integer.parseInt(size));
-        }
-
-        SearchRequest searchRequest = new SearchRequest("testrni");
-        searchRequest.types("attachment");
-        searchRequest.source(searchSourceBuilder);
-
-        SearchResponse searchResponse = client.search(searchRequest);
-
-        RestStatus status = searchResponse.status();
-        TimeValue took = searchResponse.getTook();
-        Boolean terminatedEarly = searchResponse.isTerminatedEarly();
-        boolean timedOut = searchResponse.isTimedOut();
-
-        return searchResponse.toString();
-        //return searchResponse;
-
-    }
-
-    @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
-    public String rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
-                                  @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
-
-
-        final String FIELD_NAME = "RNI_PERSON"; // Copy field
-        final String INDEX_NAME = "testrni";
-        final String INDEX_TYPE = "attachment";
-
-        QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(q);
-
-        System.out.println("Params: " + q + " - " + USERS);
-
-        BoolQueryBuilder authorizationFilter = MCFAuthService.getAuthFilter(USERS);
-
-        BoolQueryBuilder boolQuery = new BoolQueryBuilder();
-        DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
-
-        boolQuery
-                .must( // Muszáj, hogy MUST legyen az összetett keresési feltétel miatt....
-                    QueryBuilders.matchQuery(
-                            FIELD_NAME,
-                            q
-                    )
-                )
-                .filter(authorizationFilter) // így nem zavarja a SCORE-t!!!
-                .should(from)
-        ;
-
-        docScorer.queryField(FIELD_NAME, q);
-
-        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
-                new FunctionScoreQueryBuilder(docScorer)
-
-        );
-
-        queryRescorer = setRNIValuesForRescore(queryRescorer);
-
-        AggregationBuilder aggrPerson = AggregationBuilders
-                .terms("Persons")
-                .field("ENTITY:PERSON.keyword");
-
-        AggregationBuilder aggrNationality = AggregationBuilders
-                .terms("Nationality")
-                .field("ENTITY:NATIONALITY.keyword");
-
-
-        AggregationBuilder aggrLocation = AggregationBuilders
-                .terms("Locations")
-                .field("ENTITY:LOCATION.keyword");
-
-        AggregationBuilder aggrPhone = AggregationBuilders
-                .terms("Phones")
-                .field("ENTITY:IDENTIFIER:PHONE_NUMBER.keyword");
-
-        AggregationBuilder aggrURL = AggregationBuilders
-                .terms("URLs")
-                .field("ENTITY:IDENTIFIER:URL.keyword");
-
-        AggregationBuilder aggrOrganization = AggregationBuilders
-                .terms("Organizations")
-                .field("ENTITY:ORGANIZATION.keyword");
-
-        AggregationBuilder aggrProduct = AggregationBuilders
-                .terms("Products")
-                .field("ENTITY:PRODUCT.keyword");
-
-        AggregationBuilder aggrTitle = AggregationBuilders
-                .terms("Titles")
-                .field("ENTITY:TITLE.keyword");
-
-
-        HighlightBuilder highlightBuilder = new HighlightBuilder();
-        HighlightBuilder.Field highlightContent = new HighlightBuilder.Field("content_text");
-        HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
-
-        highlightBuilder.field(highlightPerson);
-        highlightBuilder.field(highlightContent);
-
-
-        SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
-        searchRequest.types(INDEX_TYPE)
-                .searchType(SearchType.DFS_QUERY_THEN_FETCH)
-                .source(new SearchSourceBuilder()
-                        .query(boolQuery).size(1) //20
-                        .addRescorer(queryRescorer)
-
-                        .aggregation(aggrPerson)
-                        .aggregation(aggrNationality)
-                        .aggregation(aggrLocation)
-                        .aggregation(aggrPhone)
-                        .aggregation(aggrOrganization)
-                        .aggregation(aggrProduct)
-                        .aggregation(aggrTitle)
-                        .aggregation(aggrURL)
-
-                        .highlighter(highlightBuilder)
-                        .explain(true)
-
-
-                );
-
-
-        // TODO.... not works as OBJ... exc because of ENTITY can not be convert to JSON....
-        return client.search(searchRequest).toString();
-
-    }
-
-
-    // Ezek a szükséges RNI default értékek... játszani velük, haminden jól megy már...
-
-
-
-    private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
-        return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
     }
 
 }
