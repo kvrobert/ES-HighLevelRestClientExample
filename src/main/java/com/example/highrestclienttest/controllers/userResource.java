@@ -50,7 +50,9 @@ public class userResource {
 
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
-    public String insert(@PathVariable final String name, @PathVariable final String age, @PathVariable final String hobby) throws IOException {
+    public String insert(@PathVariable final String name,
+                         @PathVariable final String age,
+                         @PathVariable final String hobby) throws IOException {
 
         IndexRequest request = new IndexRequest(
                 "restindex",
@@ -438,6 +440,9 @@ public class userResource {
 
 
     // Ezek a szükséges RNI default értékek... játszani velük, haminden jól megy már...
+
+
+
     private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
         return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
     }
