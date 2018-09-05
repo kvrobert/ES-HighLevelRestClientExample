@@ -1,6 +1,6 @@
 package com.example.highrestclienttest.service;
 
-public class SearchRequestMFC {
+public class MCFSearchService {
 
 
 }

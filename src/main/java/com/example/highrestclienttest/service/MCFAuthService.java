@@ -19,12 +19,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class MFCAuthService {
+public class MCFAuthService {
 
     @Autowired
     MCFConfigurationParameters mcfConfigurationParameters;
 
-    private static final Logger LOG = LoggerFactory.getLogger(MFCAuthService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MCFAuthService.class);
     private static final String NOSECURITY_TOKEN = "__nosecurity__";
 
     private String authorityBaseURL;
