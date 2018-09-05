@@ -2,7 +2,7 @@ package com.example.highrestclienttest;
 
 import com.example.highrestclienttest.configs.IndexConfiguration;
 import com.example.highrestclienttest.configs.MCFConfigurationParameters;
-import com.example.highrestclienttest.service.MFCAuthService;
+import com.example.highrestclienttest.service.MCFAuthService;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -33,8 +33,8 @@ public class HighRestClientTestApplication {
     }
 
     @Bean
-    public MFCAuthService mfcAuthService(){
-        return new MFCAuthService();
+    public MCFAuthService mfcAuthService(){
+        return new MCFAuthService();
     }
 
     @Bean

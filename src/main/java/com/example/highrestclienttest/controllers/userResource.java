@@ -3,7 +3,7 @@ package com.example.highrestclienttest.controllers;
 
 import com.basistech.rni.es.DocScoreFunctionBuilder;
 import com.example.highrestclienttest.service.KeycloakService;
-import com.example.highrestclienttest.service.MFCAuthService;
+import com.example.highrestclienttest.service.MCFAuthService;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -26,9 +26,13 @@ import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.rescore.QueryRescorerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -43,7 +47,7 @@ public class userResource {
 
 
     @Autowired
-    private MFCAuthService mfcAuthService;
+    private MCFAuthService MCFAuthService;
 
     @Autowired
     private KeycloakService keycloakService;
@@ -329,7 +333,7 @@ public class userResource {
 
 
     @GetMapping("/authtest")
-    public SearchHits authTest(@RequestParam(value = "q", defaultValue = "*") final String QUERY_STRING,
+    public String authTest(@RequestParam(value = "q", defaultValue = "*") final String QUERY_STRING,
                                @RequestParam(value = "u", defaultValue = "empty") final String USERS,
                                @RequestParam(value = "df", defaultValue = "") final String df,
                                @RequestParam(value = "analyzer", defaultValue = "") final String analyzer,
@@ -350,7 +354,7 @@ public class userResource {
             USERNAME_DOMAIN = USERS;
         }
         System.out.println(KEYCLOAK_ACCESS_TOKEN);
-        BoolQueryBuilder authorizationFilter = mfcAuthService.getAuthFilter(USERNAME_DOMAIN);
+        BoolQueryBuilder authorizationFilter = MCFAuthService.getAuthFilter(USERNAME_DOMAIN);
 
         QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(QUERY_STRING);
 
@@ -368,11 +372,16 @@ public class userResource {
             }
         }
 
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
+
+        highlightBuilder.field(highlightPerson);
+
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 .must(from)
                 .must(authorizationFilter)
-        );
+        ).highlighter(highlightBuilder);
 
         if(!size.equals("")) {
             searchSourceBuilder.size(Integer.parseInt(size));
@@ -389,13 +398,13 @@ public class userResource {
         Boolean terminatedEarly = searchResponse.isTerminatedEarly();
         boolean timedOut = searchResponse.isTimedOut();
 
-        //return searchResponse.getHits();
-        return searchResponse.getHits();
+        return searchResponse.toString();
+        //return searchResponse;
 
     }
 
-    @GetMapping("/rniauth")
-    public SearchHits rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
+    @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    public String rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
                                   @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
 
 
@@ -403,19 +412,25 @@ public class userResource {
         final String INDEX_NAME = "testrni";
         final String INDEX_TYPE = "attachment";
 
+        QueryStringQueryBuilder from = QueryBuilders.queryStringQuery(q);
+
         System.out.println("Params: " + q + " - " + USERS);
 
-        BoolQueryBuilder authorizationFilter = mfcAuthService.getAuthFilter(USERS);
+        BoolQueryBuilder authorizationFilter = MCFAuthService.getAuthFilter(USERS);
 
         BoolQueryBuilder boolQuery = new BoolQueryBuilder();
         DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
 
-        boolQuery.must( // Muszáj, hogy MUST legyen az összetett keresési feltétel miatt....
-                QueryBuilders.matchQuery(
-                        FIELD_NAME,
-                        q
+        boolQuery
+                .must( // Muszáj, hogy MUST legyen az összetett keresési feltétel miatt....
+                    QueryBuilders.matchQuery(
+                            FIELD_NAME,
+                            q
+                    )
                 )
-        ).must(authorizationFilter);
+                .filter(authorizationFilter) // így nem zavarja a SCORE-t!!!
+                .should(from)
+        ;
 
         docScorer.queryField(FIELD_NAME, q);
 
@@ -426,16 +441,74 @@ public class userResource {
 
         queryRescorer = setRNIValuesForRescore(queryRescorer);
 
+        AggregationBuilder aggrPerson = AggregationBuilders
+                .terms("Persons")
+                .field("ENTITY:PERSON.keyword");
+
+        AggregationBuilder aggrNationality = AggregationBuilders
+                .terms("Nationality")
+                .field("ENTITY:NATIONALITY.keyword");
+
+
+        AggregationBuilder aggrLocation = AggregationBuilders
+                .terms("Locations")
+                .field("ENTITY:LOCATION.keyword");
+
+        AggregationBuilder aggrPhone = AggregationBuilders
+                .terms("Phones")
+                .field("ENTITY:IDENTIFIER:PHONE_NUMBER.keyword");
+
+        AggregationBuilder aggrURL = AggregationBuilders
+                .terms("URLs")
+                .field("ENTITY:IDENTIFIER:URL.keyword");
+
+        AggregationBuilder aggrOrganization = AggregationBuilders
+                .terms("Organizations")
+                .field("ENTITY:ORGANIZATION.keyword");
+
+        AggregationBuilder aggrProduct = AggregationBuilders
+                .terms("Products")
+                .field("ENTITY:PRODUCT.keyword");
+
+        AggregationBuilder aggrTitle = AggregationBuilders
+                .terms("Titles")
+                .field("ENTITY:TITLE.keyword");
+
+
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        HighlightBuilder.Field highlightContent = new HighlightBuilder.Field("content_text");
+        HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
+
+        highlightBuilder.field(highlightPerson);
+        highlightBuilder.field(highlightContent);
+
 
         SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
         searchRequest.types(INDEX_TYPE)
                 .searchType(SearchType.DFS_QUERY_THEN_FETCH)
-                .source(new SearchSourceBuilder().query(boolQuery).size(20)
-                        .addRescorer(queryRescorer));
+                .source(new SearchSourceBuilder()
+                        .query(boolQuery).size(1) //20
+                        .addRescorer(queryRescorer)
+
+                        .aggregation(aggrPerson)
+                        .aggregation(aggrNationality)
+                        .aggregation(aggrLocation)
+                        .aggregation(aggrPhone)
+                        .aggregation(aggrOrganization)
+                        .aggregation(aggrProduct)
+                        .aggregation(aggrTitle)
+                        .aggregation(aggrURL)
+
+                        .highlighter(highlightBuilder)
+                        .explain(true)
 
 
+                );
 
-        return client.search(searchRequest).getHits();
+
+        // TODO.... not works as OBJ... exc because of ENTITY can not be convert to JSON....
+        return client.search(searchRequest).toString();
+
     }
 
 
