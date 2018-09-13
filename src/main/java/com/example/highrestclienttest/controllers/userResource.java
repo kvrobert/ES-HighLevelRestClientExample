@@ -5,11 +5,9 @@ import com.example.highrestclienttest.service.MCFAuthService;
 import com.example.highrestclienttest.service.MCFSearchService;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import jdk.internal.org.objectweb.asm.TypeReference;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -31,7 +29,6 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryStringQueryBuilder;
-import org.elasticsearch.index.search.QueryStringQueryParser;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -44,7 +41,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/rest")
@@ -153,7 +153,11 @@ public class userResource {
         String index = configNode.path("elasticParams").path("elasticIndex").asText();
         String indexType = configNode.path("elasticParams").path("elasticType").asText();
         int size = configNode.path("itemsPerPage").asInt();
-        from = ( from -1  ) * size;
+
+        if( from > 0 ){
+            from = ( from -1  ) * size;
+        }
+
         if( !configNode.path("highlight").toString().equals("null") ){
             //Todo... Add highlight fileds for the frontend config by elasticParams, and use them here...
             HighlightBuilder highlightBuilder = new HighlightBuilder();
@@ -190,7 +194,7 @@ public class userResource {
                         .must(authorizationFilter)
         );
 
-        searchSourceBuilder.from(size * (from -1) );
+        searchSourceBuilder.from(from);
         if(!sortField.equals("")){
             if(sortOrderingText.equals("asc")){
                 searchSourceBuilder.sort(sortField, SortOrder.ASC);
@@ -200,18 +204,30 @@ public class userResource {
         }
         searchSourceBuilder.size(size);
 
-        AggregationBuilder Person = AggregationBuilders
-                .terms("ENTITY:PERSON.keyword")
-                .field("ENTITY:PERSON.keyword")
-                .size(100)
-                ;
-
-        searchSourceBuilder.aggregation(Person);
-
+       /* Building aggregations  */
+        List<String> aggregationsFieldList;
+        String aggregationsArray = configNode
+                                    .path("facets")
+                                    .path("facet_options")
+                                    .path("default")
+                                    .path("facet.field")
+                                    .toString();
+        if(aggregationsArray.equals("null")){
+            throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
+        }
+        aggregationsFieldList = mapper.readValue(aggregationsArray, List.class);
+        aggregationsFieldList.stream().forEach( aggregationField ->
+                    searchSourceBuilder.aggregation(
+                        AggregationBuilders
+                        .terms(aggregationField)
+                        .field(aggregationField)
+                        .size(100)
+                ));
 
         System.out.println("****************  BODY  ***********************************");
         System.out.println("Params....: " + paramsNode);
         System.out.println("Config....: " + configNode);
+        System.out.println("Aggregations....: " + "----");
         System.out.println("***********************************************************");
 
         if(index.equals("")){
@@ -225,6 +241,7 @@ public class userResource {
         SearchResponse searchResponse = client.search(searchRequest);
 
        // return  queryString.toString();
+       // Todo.... nem túl elegáns.. egyenlőre nincs rá sebb megoldás... esetleg custom response építés
         return  searchResponse.toString().replaceAll("sterms#","");
     }
 
