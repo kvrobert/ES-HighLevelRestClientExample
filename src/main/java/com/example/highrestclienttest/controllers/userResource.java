@@ -1,10 +1,15 @@
 package com.example.highrestclienttest.controllers;
 
+import com.example.highrestclienttest.service.KeycloakService;
+import com.example.highrestclienttest.service.MCFAuthService;
 import com.example.highrestclienttest.service.MCFSearchService;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import jdk.internal.org.objectweb.asm.TypeReference;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -22,20 +27,27 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.QueryStringQueryBuilder;
+import org.elasticsearch.index.search.QueryStringQueryParser;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.*;
 
 @RestController
-@RequestMapping("/rest/users")
+@RequestMapping("/rest")
 public class userResource {
 
     @Autowired
@@ -44,6 +56,13 @@ public class userResource {
 
     @Autowired
     private MCFSearchService mcfSearchService;
+
+    @Autowired
+    private KeycloakService keycloakService;
+
+    @Autowired
+    private MCFAuthService MCFAuthService;
+
 
 
     /**
@@ -54,9 +73,17 @@ public class userResource {
      * @throws IOException
      */
     @GetMapping(value = "/authtest")
-    public String authTest(@RequestParam Map<String, String> params,
-                           @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN // MÉG LEHET NULL, de később nem!!!
+    public Object authTest(@RequestParam Map<String, String> params,
+                           @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN, // MÉG LEHET NULL, de később nem!!!
+                           @RequestBody @Nullable final String body
                             ) throws IOException {
+
+        System.out.println("****************  BODY  ***********************************");
+        System.out.println("Req body....: " + body) ;
+        System.out.println("***********************************************************");
+
+        System.out.println("**************** PARAMS ***********************************");
+        params.entrySet().stream().forEach( param -> System.out.println(param.getKey() + " - " + param.getValue()));
 
         params.put("KEYCLOAK_ACCESS_TOKEN", KEYCLOAK_ACCESS_TOKEN);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -64,8 +91,7 @@ public class userResource {
         objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         Object obj = mcfSearchService.simpleSearchTest(params);
 
-        return obj.toString();
-
+        return obj;
         //return new ResponseEntity<>( obj, HttpStatus.OK);
         //return mcfSearchService.simpleSearchTest(params);
 
@@ -80,12 +106,147 @@ public class userResource {
         return mcfSearchService.simpleSearchRNI(q, USERS);
     }
 
+    /** Simple query string search with Faceting, for authentication using KEYCLOAK_ACCESS_TOKEN
+     * @param KEYCLOAK_ACCESS_TOKEN
+     * @param body
+     * @return
+     * @throws IOException
+     */
+    @PostMapping(value = "/_search")
+    public Object transparentSearch(
+                                @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN, // MÉG LEHET NULL, de később nem!!!
+                                @RequestBody @Nullable final String body
+                                ) throws IOException {
+        Map<String, String> params = new HashMap<>();
+        final String USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
+
+        System.out.println("JWT..." + KEYCLOAK_ACCESS_TOKEN);
+        System.out.println("Body..." + body);
+        System.out.println("User Domain..." + USERNAME_DOMAIN);
+
+
+        //QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery(body);
+        BoolQueryBuilder authorizationFilter =  MCFAuthService.getAuthFilter(USERNAME_DOMAIN);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        JsonNode requestBodyNode = mapper.readTree(body);
+
+        JsonNode paramsNode =requestBodyNode.path("bodyParams");
+        JsonNode configNode =requestBodyNode.path("config");
+
+
+    /*
+    * Build query form q and filter fields
+    * */
+        // Reading parameters from UI body parameters
+        String q = paramsNode.path("q").asText();
+        List<String> fq = Arrays.asList(paramsNode.path("fq").asText());
+        int from = paramsNode.path("start").asInt();
+        String sortField = paramsNode.path("sortField").asText();
+        String sortOrderingText = paramsNode.path("sortOrder").asText(configNode.path("sortOrderDefault").asText());
+
+
+        // Reading parameters from frontEnd config
+        String index = configNode.path("elasticParams").path("elasticIndex").asText();
+        String indexType = configNode.path("elasticParams").path("elasticType").asText();
+        int size = configNode.path("itemsPerPage").asInt();
+        from = ( from -1  ) * size;
+        if( !configNode.path("highlight").toString().equals("null") ){
+            //Todo... Add highlight fileds for the frontend config by elasticParams, and use them here...
+            HighlightBuilder highlightBuilder = new HighlightBuilder();
+            HighlightBuilder.Field highlightContentText = new HighlightBuilder.Field("content_text");
+        }
+
+        QueryStringQueryBuilder queryString = QueryBuilders.queryStringQuery(q);
+
+        List<String> fields;
+        String array = configNode.path("elasticParams").path("fullTextQueryFields").toString();
+        if(array.equals("null")){
+            throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
+        }
+        fields = mapper.readValue(array, List.class);
+        fields.stream().forEach( fild -> queryString.field(fild) );
+
+        System.out.println("==========================PARAMS======================================");
+        System.out.println();
+        System.out.println("q: " + q);
+        System.out.println("fq: " + fq);
+        System.out.println("from: " + from);
+        System.out.println("sortField: " + sortField);
+        System.out.println("sortOrdering: " + sortOrderingText);
+        System.out.println("size: " + size);
+        System.out.println("fields: " + fields);
+        System.out.println("ES-FulteqtQueryFilds: " + configNode.path("elasticParams").path("fullTextQueryFields"));
+        System.out.println("index: " + index);
+        System.out.println();
+        System.out.println("======================================================================");
+
+
+        searchSourceBuilder.query(QueryBuilders.boolQuery()
+                        .must(queryString)
+                        .must(authorizationFilter)
+        );
+
+        searchSourceBuilder.from(size * (from -1) );
+        if(!sortField.equals("")){
+            if(sortOrderingText.equals("asc")){
+                searchSourceBuilder.sort(sortField, SortOrder.ASC);
+            }else if(sortOrderingText.equals("desc")){
+                searchSourceBuilder.sort(sortField, SortOrder.DESC);
+            }
+        }
+        searchSourceBuilder.size(size);
+
+        AggregationBuilder Person = AggregationBuilders
+                .terms("ENTITY:PERSON.keyword")
+                .field("ENTITY:PERSON.keyword")
+                .size(100)
+                ;
+
+        searchSourceBuilder.aggregation(Person);
+
+
+        System.out.println("****************  BODY  ***********************************");
+        System.out.println("Params....: " + paramsNode);
+        System.out.println("Config....: " + configNode);
+        System.out.println("***********************************************************");
+
+        if(index.equals("")){
+            throw new IllegalArgumentException("Elastic index parameter must be set.");
+        }
+        SearchRequest searchRequest = new SearchRequest(index);
+        // Todo...index type from confog file
+        searchRequest.types("attachment");
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = client.search(searchRequest);
+
+       // return  queryString.toString();
+        return  searchResponse.toString().replaceAll("sterms#","");
+    }
+
+
+
+
+
+
 
 
 
     /* *********************************************************************************************************** */
     /* *********************************************************************************************************** */
     /* *********************************************************************************************************** */
+
+
+
+
+
+
+
+
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
     public String insert(@PathVariable final String name,
