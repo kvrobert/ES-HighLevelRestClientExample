@@ -1,13 +1,17 @@
 package com.example.highrestclienttest.controllers;
 
+import com.example.highrestclienttest.beans.Fq;
+import com.example.highrestclienttest.beans.UIFilterQuery;
 import com.example.highrestclienttest.service.KeycloakService;
 import com.example.highrestclienttest.service.MCFAuthService;
 import com.example.highrestclienttest.service.MCFSearchService;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.lucene.queryparser.surround.parser.QueryParser;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -25,10 +29,7 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.QueryStringQueryBuilder;
+import org.elasticsearch.index.query.*;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -188,10 +189,45 @@ public class userResource {
         System.out.println();
         System.out.println("======================================================================");
 
+        /* Building filter based on aggregation  */
+        BoolQueryBuilder fqQueryFilter = new BoolQueryBuilder();
+        List<Fq> FQFields;
+        String fqArray = paramsNode.path("fq").toString();
+        FQFields = mapper.readValue(fqArray, new TypeReference<List<Fq>>(){});
+
+
+        if( !FQFields.isEmpty() ){
+
+            System.out.println(FQFields.get(0).field);
+            FQFields.get(0).values.forEach( value -> System.out.println(value));
+
+            System.out.println("FQ size: " + FQFields.size());
+
+            FQFields.stream().forEach( fieldName -> {
+                if(fieldName.operator.equals("OR")){
+                    fieldName.values.stream().forEach( fieldValue -> fqQueryFilter.should(new TermQueryBuilder(fieldName.field,fieldValue)) );
+                } else if (fieldName.operator.equals("AND")){
+                    fieldName.values.stream().forEach( fieldValue -> fqQueryFilter.must(new TermQueryBuilder(fieldName.field,fieldValue)) );
+                }
+            });
+            System.out.println("Filter Query");
+            System.out.println(fqQueryFilter.toString());
+
+
+
+
+
+
+
+
+        }
+        System.out.println("FQ_kint: " + paramsNode.path("fq").toString());
 
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                         .must(queryString)
-                        .must(authorizationFilter)
+                        .filter(authorizationFilter)
+                        .filter(fqQueryFilter)
+
         );
 
         searchSourceBuilder.from(from);
@@ -237,8 +273,17 @@ public class userResource {
         // Todo...index type from confog file
         searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
+        System.out.println("Full Query");
+        System.out.println(searchSourceBuilder.toString());
+
+        System.out.println("Full SearchRequest: ");
+        System.out.println(searchRequest.toString());
 
         SearchResponse searchResponse = client.search(searchRequest);
+
+
+        System.out.println("Agggggs:" );
+        searchResponse.getAggregations().asList().stream().forEach(agg -> System.out.println(agg.getType()) );
 
        // return  queryString.toString();
        // Todo.... nem túl elegáns.. egyenlőre nincs rá sebb megoldás... esetleg custom response építés
