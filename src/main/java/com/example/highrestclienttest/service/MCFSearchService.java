@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class MCFSearchService {
@@ -173,23 +175,46 @@ public class MCFSearchService {
 
         boolQuery
                 .must( // Muszáj, hogy MUST legyen az összetett keresési feltétel miatt....
-                        QueryBuilders.matchQuery(
+                        QueryBuilders.queryStringQuery(q)
+                        /*QueryBuilders.matchQuery(
                                 FIELD_NAME,
                                 q
-                        )
+                        )*/
                 )
-                .filter(authorizationFilter) // így nem zavarja a SCORE-t!!!
-                .should(from);
+                .filter(authorizationFilter); // így nem zavarja a SCORE-t!!!
+               // .should(from);
 
-        docScorer.queryField(FIELD_NAME, q);
+        String patternUsingByRNI = "(?:RNI_PERSON:)(.*?)\\s(.*)";
+        Pattern pattern = Pattern.compile(patternUsingByRNI);
+        Matcher matcher = pattern.matcher(q);
+        String qForRNI = q;
+        Boolean isRNI_PersonExist = matcher.find();
+        if(isRNI_PersonExist){
+            System.out.println("MATTCCCCH " + matcher.group(1));
+            qForRNI = matcher.group(1);
+        }
 
+        System.out.println("Az RNI query: " + qForRNI);
+        docScorer.queryField(FIELD_NAME, qForRNI);
+
+        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
+                new FunctionScoreQueryBuilder(docScorer)
+
+        );
+        queryRescorer = setRNIValuesForRescore(queryRescorer);
+
+
+
+
+
+     /*   docScorer.queryField(FIELD_NAME, q);
         QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
                 new FunctionScoreQueryBuilder(docScorer)
 
         );
 
         queryRescorer = setRNIValuesForRescore(queryRescorer);
-
+*/
         HighlightBuilder highlightBuilder = new HighlightBuilder();
         HighlightBuilder.Field highlightContent = new HighlightBuilder.Field("content_text");
         HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
@@ -197,11 +222,34 @@ public class MCFSearchService {
         highlightBuilder.field(highlightPerson);
         highlightBuilder.field(highlightContent);
 
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder
+                .query(boolQuery).size(22) //20
+                //.addRescorer(queryRescorer)
+                .aggregation(AggregationSearch.Person)
+                .aggregation(AggregationSearch.Nationality)
+                .aggregation(AggregationSearch.Location)
+                .aggregation(AggregationSearch.Phone)
+                .aggregation(AggregationSearch.Organization)
+                .aggregation(AggregationSearch.Product)
+                .aggregation(AggregationSearch.Title)
+                .aggregation(AggregationSearch.URL)
+
+                .highlighter(highlightBuilder);
+
+        if(isRNI_PersonExist){
+            System.out.println("ADDED RECORE");
+            searchSourceBuilder.addRescorer(queryRescorer);
+        }
+
         SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
         searchRequest.types(INDEX_TYPE)
                 .searchType(SearchType.DFS_QUERY_THEN_FETCH)
-                .source(new SearchSourceBuilder()
-                        .query(boolQuery).size(1) //20
+                .source( searchSourceBuilder
+
+                        /*new SearchSourceBuilder()
+                        .query(boolQuery).size(20) //20
                         .addRescorer(queryRescorer)
 
                         .aggregation(AggregationSearch.Person)
@@ -214,7 +262,7 @@ public class MCFSearchService {
                         .aggregation(AggregationSearch.URL)
 
                         .highlighter(highlightBuilder)
-                        .explain(true)
+                        //.explain(true)*/
                 );
 
 
