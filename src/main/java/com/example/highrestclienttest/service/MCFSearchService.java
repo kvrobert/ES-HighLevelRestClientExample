@@ -192,7 +192,7 @@ public class MCFSearchService {
         int relevantName = 0;
         StringBuffer RNiPersons = new StringBuffer();
         List<String> splitedNames = Arrays.asList(q.split(FIELD_NAME + ":"));
-        Boolean isUsingRnNI = !splitedNames.isEmpty();
+        Boolean isUsingRnNI = splitedNames.size() > 1 ? true:false;
         if(isUsingRnNI){
         splitedNames.stream().forEach(tag ->
                 {
