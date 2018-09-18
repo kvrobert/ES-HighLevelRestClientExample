@@ -1,7 +1,7 @@
 package com.example.highrestclienttest.controllers;
 
+import com.basistech.rni.es.DocScoreFunctionBuilder;
 import com.example.highrestclienttest.beans.Fq;
-import com.example.highrestclienttest.beans.UIFilterQuery;
 import com.example.highrestclienttest.service.KeycloakService;
 import com.example.highrestclienttest.service.MCFAuthService;
 import com.example.highrestclienttest.service.MCFSearchService;
@@ -11,7 +11,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.lucene.queryparser.surround.parser.QueryParser;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -30,12 +29,13 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.*;
+import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.rescore.QueryRescorerBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -95,8 +95,6 @@ public class userResource {
         return obj;
         //return new ResponseEntity<>( obj, HttpStatus.OK);
         //return mcfSearchService.simpleSearchTest(params);
-
-
     }
 
     @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
@@ -120,6 +118,7 @@ public class userResource {
                                 ) throws IOException {
         Map<String, String> params = new HashMap<>();
         final String USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
+        final String RNI_FIELD_NAME = "RNI_PERSON";
 
         System.out.println("JWT..." + KEYCLOAK_ACCESS_TOKEN);
         System.out.println("Body..." + body);
@@ -165,7 +164,14 @@ public class userResource {
             HighlightBuilder.Field highlightContentText = new HighlightBuilder.Field("content_text");
         }
 
+        StringBuffer RNiPersons = new StringBuffer();
+        List<String> splitedRNINames = Arrays.asList(q.split(RNI_FIELD_NAME + ":"));
+        Boolean isUsingRnNI = splitedRNINames.size() > 1 ? true:false;
+
+
+        DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
         QueryStringQueryBuilder queryString = QueryBuilders.queryStringQuery(q);
+
 
         List<String> fields;
         String array = configNode.path("elasticParams").path("fullTextQueryFields").toString();
@@ -174,6 +180,9 @@ public class userResource {
         }
         fields = mapper.readValue(array, List.class);
         fields.stream().forEach( fild -> queryString.field(fild) );
+        if(isUsingRnNI){
+            queryString.field(RNI_FIELD_NAME);
+        }
 
         System.out.println("==========================PARAMS======================================");
         System.out.println();
@@ -212,14 +221,6 @@ public class userResource {
             });
             System.out.println("Filter Query");
             System.out.println(fqQueryFilter.toString());
-
-
-
-
-
-
-
-
         }
         System.out.println("FQ_kint: " + paramsNode.path("fq").toString());
 
@@ -227,7 +228,6 @@ public class userResource {
                         .must(queryString)
                         .filter(authorizationFilter)
                         .filter(fqQueryFilter)
-
         );
 
         searchSourceBuilder.from(from);
@@ -260,6 +260,37 @@ public class userResource {
                         .size(100)
                 ));
 
+
+        // RESCORER
+        // FOR REGEX IF NEEDED: [(]RNI_PERSON:[a-zA-Zá-űÁ-Ű\s]+[)]
+        String qForRNI = q;
+        int relevantName = 0;
+        if(isUsingRnNI){
+            splitedRNINames.stream().forEach(tag ->
+                    {
+                        System.out.println(tag);
+                        RNiPersons.append(tag.split(" ")[relevantName]).append(" ");
+                    }
+
+            );
+            System.out.println("A szükséges nevek: " + RNiPersons);
+            qForRNI = RNiPersons.toString();
+        }
+        System.out.println("Az RNI query: " + qForRNI);
+        docScorer.queryField(RNI_FIELD_NAME, qForRNI);
+
+        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
+                new FunctionScoreQueryBuilder(docScorer)
+
+        );
+        queryRescorer = setRNIValuesForRescore(queryRescorer);
+
+        if(isUsingRnNI){
+            System.out.println("ADDED RECORER");
+            searchSourceBuilder.addRescorer(queryRescorer);
+        }
+
+
         System.out.println("****************  BODY  ***********************************");
         System.out.println("Params....: " + paramsNode);
         System.out.println("Config....: " + configNode);
@@ -291,6 +322,9 @@ public class userResource {
     }
 
 
+    private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
+        return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
+    }
 
 
 
