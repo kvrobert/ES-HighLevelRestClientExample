@@ -25,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -182,18 +184,26 @@ public class MCFSearchService {
                         )*/
                 )
                 .filter(authorizationFilter); // így nem zavarja a SCORE-t!!!
-               // .should(from);
+               // .should(from); // Nem kell most, mert az RNIis is queryStringgel megy
 
-        String patternUsingByRNI = "(?:RNI_PERSON:)(.*?)\\s(.*)";
-        Pattern pattern = Pattern.compile(patternUsingByRNI);
-        Matcher matcher = pattern.matcher(q);
+
+
         String qForRNI = q;
-        Boolean isRNI_PersonExist = matcher.find();
-        if(isRNI_PersonExist){
-            System.out.println("MATTCCCCH " + matcher.group(1));
-            qForRNI = matcher.group(1);
-        }
+        int relevantName = 0;
+        StringBuffer RNiPersons = new StringBuffer();
+        List<String> splitedNames = Arrays.asList(q.split(FIELD_NAME + ":"));
+        Boolean isUsingRnNI = !splitedNames.isEmpty();
+        if(isUsingRnNI){
+        splitedNames.stream().forEach(tag ->
+                {
+                    System.out.println(tag);
+                    RNiPersons.append(tag.split(" ")[relevantName]).append(" ");
+                }
 
+        );
+        System.out.println("A szükséges nevek: " + RNiPersons);
+        qForRNI = RNiPersons.toString();
+        }
         System.out.println("Az RNI query: " + qForRNI);
         docScorer.queryField(FIELD_NAME, qForRNI);
 
@@ -203,18 +213,6 @@ public class MCFSearchService {
         );
         queryRescorer = setRNIValuesForRescore(queryRescorer);
 
-
-
-
-
-     /*   docScorer.queryField(FIELD_NAME, q);
-        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
-                new FunctionScoreQueryBuilder(docScorer)
-
-        );
-
-        queryRescorer = setRNIValuesForRescore(queryRescorer);
-*/
         HighlightBuilder highlightBuilder = new HighlightBuilder();
         HighlightBuilder.Field highlightContent = new HighlightBuilder.Field("content_text");
         HighlightBuilder.Field highlightPerson = new HighlightBuilder.Field("ENTITY:PERSON");
@@ -238,7 +236,7 @@ public class MCFSearchService {
 
                 .highlighter(highlightBuilder);
 
-        if(isRNI_PersonExist){
+        if(isUsingRnNI){
             System.out.println("ADDED RECORE");
             searchSourceBuilder.addRescorer(queryRescorer);
         }
@@ -247,22 +245,6 @@ public class MCFSearchService {
         searchRequest.types(INDEX_TYPE)
                 .searchType(SearchType.DFS_QUERY_THEN_FETCH)
                 .source( searchSourceBuilder
-
-                        /*new SearchSourceBuilder()
-                        .query(boolQuery).size(20) //20
-                        .addRescorer(queryRescorer)
-
-                        .aggregation(AggregationSearch.Person)
-                        .aggregation(AggregationSearch.Nationality)
-                        .aggregation(AggregationSearch.Location)
-                        .aggregation(AggregationSearch.Phone)
-                        .aggregation(AggregationSearch.Organization)
-                        .aggregation(AggregationSearch.Product)
-                        .aggregation(AggregationSearch.Title)
-                        .aggregation(AggregationSearch.URL)
-
-                        .highlighter(highlightBuilder)
-                        //.explain(true)*/
                 );
 
 
