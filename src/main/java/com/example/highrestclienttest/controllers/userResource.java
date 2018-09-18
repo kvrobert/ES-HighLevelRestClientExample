@@ -97,6 +97,14 @@ public class userResource {
         //return mcfSearchService.simpleSearchTest(params);
     }
 
+    /** Searching with RNI and parameter based user auth.
+     * RNI as QueryString
+     * AUTH as filter -> does not affect the score
+     * @param q
+     * @param USERS
+     * @return
+     * @throws IOException
+     */
     @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public String rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
                           @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
