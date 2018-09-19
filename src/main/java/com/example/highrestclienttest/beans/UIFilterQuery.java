@@ -22,7 +22,7 @@ public class UIFilterQuery {
     @JsonProperty("fq")
     public List<Fq> fq = null;
     @JsonProperty("start")
-    public String start;
+    public int start;
     @JsonProperty("sortField")
     public String sortField;
     @JsonProperty("sortOrder")
@@ -46,7 +46,7 @@ public class UIFilterQuery {
      * @param config
      * @param fq
      */
-    public UIFilterQuery(String q, List<Fq> fq, String start, String sortField, String sortOrder, String config) {
+    public UIFilterQuery(String q, List<Fq> fq, int start, String sortField, String sortOrder, String config) {
         super();
         this.q = q;
         this.fq = fq;
