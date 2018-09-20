@@ -1,14 +1,8 @@
 package com.example.highrestclienttest.controllers;
 
-import com.basistech.rni.es.DocScoreFunctionBuilder;
-import com.example.highrestclienttest.beans.Fq;
-import com.example.highrestclienttest.service.KeycloakService;
-import com.example.highrestclienttest.service.MCFAuthService;
 import com.example.highrestclienttest.service.MCFSearchService;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.elasticsearch.action.DocWriteRequest;
@@ -28,23 +22,17 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.query.*;
-import org.elasticsearch.index.query.functionscore.FunctionScoreQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
-import org.elasticsearch.search.rescore.QueryRescorerBuilder;
-import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -57,13 +45,6 @@ public class userResource {
 
     @Autowired
     private MCFSearchService mcfSearchService;
-
-    @Autowired
-    private KeycloakService keycloakService;
-
-    @Autowired
-    private MCFAuthService MCFAuthService;
-
 
 
     /**
@@ -124,215 +105,15 @@ public class userResource {
                                 @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN, // MÉG LEHET NULL, de később nem!!!
                                 @RequestBody @Nullable final String body
                                 ) throws IOException {
+
         Map<String, String> params = new HashMap<>();
-        final String USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
-        final String RNI_FIELD_NAME = "RNI_PERSON";
+        params.put("body", body);
+        params.put("KEYCLOAK_ACCESS_TOKEN", KEYCLOAK_ACCESS_TOKEN);
 
-        System.out.println("JWT..." + KEYCLOAK_ACCESS_TOKEN);
-        System.out.println("Body..." + body);
-        System.out.println("User Domain..." + USERNAME_DOMAIN);
-
-
-        //QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery(body);
-        BoolQueryBuilder authorizationFilter =  MCFAuthService.getAuthFilter(USERNAME_DOMAIN);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        JsonNode requestBodyNode = mapper.readTree(body);
-
-        JsonNode paramsNode =requestBodyNode.path("bodyParams");
-        JsonNode configNode =requestBodyNode.path("config");
-
-
-    /*
-    * Build query form q and filter fields
-    * */
-        // Reading parameters from UI body parameters
-        String q = paramsNode.path("q").asText();
-        List<String> fq = Arrays.asList(paramsNode.path("fq").asText());
-        int from = paramsNode.path("start").asInt();
-        String sortField = paramsNode.path("sortField").asText();
-        String sortOrderingText = paramsNode.path("sortOrder").asText(configNode.path("sortOrderDefault").asText());
-
-
-        // Reading parameters from frontEnd config
-        String index = configNode.path("elasticParams").path("elasticIndex").asText();
-        String indexType = configNode.path("elasticParams").path("elasticType").asText();
-        int size = configNode.path("itemsPerPage").asInt();
-
-        if( from > 0 ){
-            from = ( from -1  ) * size;
-        }
-
-        if( !configNode.path("highlight").toString().equals("null") ){
-            //Todo... Add highlight fileds for the frontend config by elasticParams, and use them here...
-            HighlightBuilder highlightBuilder = new HighlightBuilder();
-            HighlightBuilder.Field highlightContentText = new HighlightBuilder.Field("content_text");
-        }
-
-        StringBuffer RNiPersons = new StringBuffer();
-        List<String> splitedRNINames = Arrays.asList(q.split(RNI_FIELD_NAME + ":"));
-        Boolean isUsingRnNI = splitedRNINames.size() > 1 ? true:false;
-
-
-        DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
-        QueryStringQueryBuilder queryString = QueryBuilders.queryStringQuery(q);
-
-
-        List<String> fields;
-        String array = configNode.path("elasticParams").path("fullTextQueryFields").toString();
-        if(array.equals("null")){
-            throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
-        }
-        fields = mapper.readValue(array, List.class);
-        fields.stream().forEach( fild -> queryString.field(fild) );
-        if(isUsingRnNI){
-            queryString.field(RNI_FIELD_NAME);
-        }
-
-        System.out.println("==========================PARAMS======================================");
-        System.out.println();
-        System.out.println("q: " + q);
-        System.out.println("fq: " + fq);
-        System.out.println("from: " + from);
-        System.out.println("sortField: " + sortField);
-        System.out.println("sortOrdering: " + sortOrderingText);
-        System.out.println("size: " + size);
-        System.out.println("fields: " + fields);
-        System.out.println("ES-FulteqtQueryFilds: " + configNode.path("elasticParams").path("fullTextQueryFields"));
-        System.out.println("index: " + index);
-        System.out.println();
-        System.out.println("======================================================================");
-
-        /* Building filter based on aggregation  */
-        BoolQueryBuilder fqQueryFilter = new BoolQueryBuilder();
-        List<Fq> FQFields;
-        String fqArray = paramsNode.path("fq").toString();
-        FQFields = mapper.readValue(fqArray, new TypeReference<List<Fq>>(){});
-
-
-        if( !FQFields.isEmpty() ){
-
-            System.out.println(FQFields.get(0).field);
-            FQFields.get(0).values.forEach( value -> System.out.println(value));
-
-            System.out.println("FQ size: " + FQFields.size());
-
-            FQFields.stream().forEach( fieldName -> {
-                if(fieldName.operator.equals("OR")){
-                    fieldName.values.stream().forEach( fieldValue -> fqQueryFilter.should(new TermQueryBuilder(fieldName.field,fieldValue)) );
-                } else if (fieldName.operator.equals("AND")){
-                    fieldName.values.stream().forEach( fieldValue -> fqQueryFilter.must(new TermQueryBuilder(fieldName.field,fieldValue)) );
-                }
-            });
-            System.out.println("Filter Query");
-            System.out.println(fqQueryFilter.toString());
-        }
-        System.out.println("FQ_kint: " + paramsNode.path("fq").toString());
-
-        searchSourceBuilder.query(QueryBuilders.boolQuery()
-                        .must(queryString)
-                        .filter(authorizationFilter)
-                        .filter(fqQueryFilter)
-        );
-
-        searchSourceBuilder.from(from);
-        if(!sortField.equals("")){
-            if(sortOrderingText.equals("asc")){
-                searchSourceBuilder.sort(sortField, SortOrder.ASC);
-            }else if(sortOrderingText.equals("desc")){
-                searchSourceBuilder.sort(sortField, SortOrder.DESC);
-            }
-        }
-        searchSourceBuilder.size(size);
-
-       /* Building aggregations  */
-        List<String> aggregationsFieldList;
-        String aggregationsArray = configNode
-                                    .path("facets")
-                                    .path("facet_options")
-                                    .path("default")
-                                    .path("facet.field")
-                                    .toString();
-        if(aggregationsArray.equals("null")){
-            throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
-        }
-        aggregationsFieldList = mapper.readValue(aggregationsArray, List.class);
-        aggregationsFieldList.stream().forEach( aggregationField ->
-                    searchSourceBuilder.aggregation(
-                        AggregationBuilders
-                        .terms(aggregationField)
-                        .field(aggregationField)
-                        .size(100)
-                ));
-
-
-        // RESCORER
-        // FOR REGEX IF NEEDED: [(]RNI_PERSON:[a-zA-Zá-űÁ-Ű\s]+[)]
-        String qForRNI = q;
-        int relevantName = 0;
-        if(isUsingRnNI){
-            splitedRNINames.stream().forEach(tag ->
-                    {
-                        System.out.println(tag);
-                        RNiPersons.append(tag.split(" ")[relevantName]).append(" ");
-                    }
-
-            );
-            System.out.println("A szükséges nevek: " + RNiPersons);
-            qForRNI = RNiPersons.toString();
-        }
-        System.out.println("Az RNI query: " + qForRNI);
-        docScorer.queryField(RNI_FIELD_NAME, qForRNI);
-
-        QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
-                new FunctionScoreQueryBuilder(docScorer)
-
-        );
-        queryRescorer = setRNIValuesForRescore(queryRescorer);
-
-        if(isUsingRnNI){
-            System.out.println("ADDED RECORER");
-            searchSourceBuilder.addRescorer(queryRescorer);
-        }
-
-
-        System.out.println("****************  BODY  ***********************************");
-        System.out.println("Params....: " + paramsNode);
-        System.out.println("Config....: " + configNode);
-        System.out.println("Aggregations....: " + "----");
-        System.out.println("***********************************************************");
-
-        if(index.equals("")){
-            throw new IllegalArgumentException("Elastic index parameter must be set.");
-        }
-        SearchRequest searchRequest = new SearchRequest(index);
-        // Todo...index type from confog file
-        searchRequest.types("attachment");
-        searchRequest.source(searchSourceBuilder);
-        System.out.println("Full Query");
-        System.out.println(searchSourceBuilder.toString());
-
-        System.out.println("Full SearchRequest: ");
-        System.out.println(searchRequest.toString());
-
-        SearchResponse searchResponse = client.search(searchRequest);
-
-
-        System.out.println("Agggggs:" );
-        searchResponse.getAggregations().asList().stream().forEach(agg -> System.out.println(agg.getType()) );
-
-       // return  queryString.toString();
-       // Todo.... nem túl elegáns.. egyenlőre nincs rá sebb megoldás... esetleg custom response építés
-        return  searchResponse.toString().replaceAll("sterms#","");
+        return mcfSearchService.transparentSearchService(params);
     }
 
 
-    private QueryRescorerBuilder setRNIValuesForRescore(QueryRescorerBuilder queryRescorerBuilder) {
-        return queryRescorerBuilder.setQueryWeight(0.0f).setRescoreQueryWeight(1.0f);
-    }
 
 
 

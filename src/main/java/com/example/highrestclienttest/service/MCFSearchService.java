@@ -29,8 +29,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class MCFSearchService {
@@ -314,8 +312,7 @@ public class MCFSearchService {
         StringBuffer RNiPersons = new StringBuffer();
         List<String> splitedRNINames = Arrays.asList(q.split(RNI_FIELD_NAME + ":"));
         boolean isUsingRnNI = splitedRNINames.size() > 1;
-
-
+        boolean isUsingSpecificSearch = q.contains(":");
         DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
         QueryStringQueryBuilder queryString = QueryBuilders.queryStringQuery(q);
 
@@ -326,8 +323,11 @@ public class MCFSearchService {
         if(fieldsString.equals("null")){
             throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
         }
-        fields = mapper.readValue(fieldsString, List.class);
-        fields.forEach( queryString::field );
+        if(!isUsingSpecificSearch){
+            fields = mapper.readValue(fieldsString, List.class);
+            fields.forEach( queryString::field );
+            System.out.println("USING SPEC SEARCH (:)");
+        }
         if(isUsingRnNI){
             queryString.field(RNI_FIELD_NAME);
         }
@@ -339,7 +339,6 @@ public class MCFSearchService {
         System.out.println("sortField: " + sortField);
         System.out.println("sortOrdering: " + sortOrderingText);
         System.out.println("size: " + size);
-        System.out.println("fields: " + fields);
         System.out.println("ES-FulteqtQueryFilds: " + configNode.path("elasticParams").path("fullTextQueryFields"));
         System.out.println("index: " + index);
         System.out.println();
@@ -465,16 +464,16 @@ public class MCFSearchService {
 
     private String createRNINames(StringBuffer RNiPersons, List<String> splitedRNINames, int relevantNamePosition) {
         String RNINames;
+        String noAlphabetAndTagsToDelete = "[^A-Za-zÁ-Űá-ű\\s]|AND|OR|NOT";
         splitedRNINames.forEach(tag ->
                 {
                     System.out.println(tag);
                     RNiPersons.append(tag.split(" ")[relevantNamePosition]).append(" ");
                 }
-
         );
         System.out.println("A szükséges nevek: " + RNiPersons);
         RNINames = RNiPersons.toString();
-        return RNINames;
+        return RNINames.replaceAll(noAlphabetAndTagsToDelete, "");
     }
 
 
