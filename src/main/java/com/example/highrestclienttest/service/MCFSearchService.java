@@ -7,6 +7,8 @@ import com.example.highrestclienttest.beans.UIFilterQuery;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
@@ -142,7 +144,12 @@ public class MCFSearchService {
         searchRequest.types("attachment");
         searchRequest.source(searchSourceBuilder);
 
-        SearchResponse searchResponse = client.search(searchRequest);
+        SearchResponse searchResponse;
+        try {
+            searchResponse = client.search(searchRequest);
+        }catch (Exception ex){
+            throw new ElasticsearchException(ex.getLocalizedMessage());
+        }
 
         RestStatus status = searchResponse.status();
         TimeValue took = searchResponse.getTook();
@@ -191,7 +198,7 @@ public class MCFSearchService {
         int relevantName = 0;
         StringBuffer RNiPersons = new StringBuffer();
         List<String> splitedNames = Arrays.asList(q.split(FIELD_NAME + ":"));
-        Boolean isUsingRnNI = splitedNames.size() > 1 ? true:false;
+        boolean isUsingRnNI = splitedNames.size() > 1;
         if(isUsingRnNI){
             qForRNI = createRNINames(RNiPersons, splitedNames, relevantName);
         }
@@ -253,10 +260,6 @@ public class MCFSearchService {
         final String USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
         final String RNI_FIELD_NAME = "RNI_PERSON";
 
-        System.out.println("JWT..." + params.get("KEYCLOAK_ACCESS_TOKEN"));
-        System.out.println("Body..." + params.get("body"));
-        System.out.println("User Domain..." + USERNAME_DOMAIN);
-
         BoolQueryBuilder authorizationFilter =  MCFAuthService.getAuthFilter(USERNAME_DOMAIN);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
 
@@ -272,20 +275,15 @@ public class MCFSearchService {
 
         /*
          * Build query form q and filter fields
-         * */
+         *
+         */
+
+
         // Reading parameters from UI body parameters
 
         UIFilterQuery uiQueryParams;
         String UiQueryParamsString = paramsNode.toString();
         uiQueryParams = mapper.readValue(UiQueryParamsString, new TypeReference<UIFilterQuery>(){});
-
-
-        System.out.println("UI QUERY BODY: " + uiQueryParams.q);
-        System.out.println("UI QUERY FQ: ");
-        uiQueryParams.fq.forEach(fq -> System.out.println(fq.field+" " + fq.operator +" "+ fq.values));
-        System.out.println("UI QShort field: " + uiQueryParams.sortField);
-        System.out.println("UI QShort order: " + uiQueryParams.sortOrder);
-        System.out.println("UI start: " + uiQueryParams.start);
 
         String q = uiQueryParams.q;
         int from = uiQueryParams.start;
@@ -316,10 +314,9 @@ public class MCFSearchService {
         DocScoreFunctionBuilder docScorer = new DocScoreFunctionBuilder();
         QueryStringQueryBuilder queryString = QueryBuilders.queryStringQuery(q);
 
-
         List<String> fields;
         String fieldsString = configNode.path("elasticParams").path("fullTextQueryFields").toString();
-        System.out.println("A fieldek:" + fieldsString);
+
         if(fieldsString.equals("null")){
             throw new IllegalArgumentException("Elastic Params mustn't be null in config file.");
         }
@@ -332,7 +329,7 @@ public class MCFSearchService {
             queryString.field(RNI_FIELD_NAME);
         }
 
-        System.out.println("==========================PARAMS======================================");
+        System.out.println("========================== PARAMS ======================================");
         System.out.println();
         System.out.println("q: " + q);
         System.out.println("from: " + from);
@@ -414,12 +411,11 @@ public class MCFSearchService {
         int relevantNamePosition = 0;
         if(isUsingRnNI){
             qForRNI = createRNINames(RNiPersons, splitedRNINames, relevantNamePosition);
-
-
-
-
+            if (qForRNI.trim().isEmpty()){
+                throw new ElasticsearchParseException( "RNI Names parsing error. Name field must be filled.");
+            }
         }
-        System.out.println("Az RNI query: " + qForRNI);
+        System.out.println("Az RNI Name query: " + qForRNI);
         docScorer.queryField(RNI_FIELD_NAME, qForRNI);
 
         QueryRescorerBuilder queryRescorer = new QueryRescorerBuilder(
@@ -429,15 +425,13 @@ public class MCFSearchService {
         queryRescorer = setRNIValuesForRescore(queryRescorer);
 
         if(isUsingRnNI){
-            System.out.println("ADDED RESCORER");
+            System.out.println("USING RNI RESCORER");
             searchSourceBuilder.addRescorer(queryRescorer);
         }
-
 
         System.out.println("****************  BODY  ***********************************");
         System.out.println("Params....: " + paramsNode);
         System.out.println("Config....: " + configNode);
-        System.out.println("Aggregations....: " + "----");
         System.out.println("***********************************************************");
 
         if(index.equals("")){
@@ -453,18 +447,27 @@ public class MCFSearchService {
         System.out.println("Full SearchRequest: ");
         System.out.println(searchRequest.toString());
 
-        SearchResponse searchResponse = client.search(searchRequest);
-
-        // return  queryString.toString();
+        SearchResponse searchResponse;
+        try {
+            searchResponse = client.search(searchRequest);
+        }catch (Exception ex){
+            throw new ElasticsearchException("Elasticsearch client error. " + ex.getLocalizedMessage());
+        }
         // Todo.... nem túl elegáns.. egyenlőre nincs rá szebb megoldásom... esetleg custom response építés
         return  searchResponse.toString().replaceAll("sterms#","");
-
-
     }
 
+
+    /** Generate Names for RNI name field from the q param RNI_PERSON field.
+     *
+     * @param RNiPersons:
+     * @param splitedRNINames:
+     * @param relevantNamePosition:
+     * @return
+     */
     private String createRNINames(StringBuffer RNiPersons, List<String> splitedRNINames, int relevantNamePosition) {
         String RNINames;
-        String noAlphabetAndTagsToDelete = "[^A-Za-zÁ-Űá-ű\\s]|AND|OR|NOT";
+        //String noAlphabetAndTagsToDelete = "[^A-Za-zÁ-Űá-ű\\s]|AND|OR|NOT"; // Not works, beacasuse of... スミス
         splitedRNINames.forEach(tag ->
                 {
                     System.out.println(tag);
@@ -473,7 +476,7 @@ public class MCFSearchService {
         );
         System.out.println("A szükséges nevek: " + RNiPersons);
         RNINames = RNiPersons.toString();
-        return RNINames.replaceAll(noAlphabetAndTagsToDelete, "");
+        return RNINames;
     }
 
 

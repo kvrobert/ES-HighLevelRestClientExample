@@ -96,7 +96,7 @@ public class MCFAuthService {
 
         } catch (Exception ex) {
             LOG.error(ex.getMessage());
-            throw new MCFAuthorizerException(ex.getMessage());
+            throw new MCFAuthorizerException("MCF Authorizer error. " + ex.getMessage());
         }
         return tokenList;
     }
