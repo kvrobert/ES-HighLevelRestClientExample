@@ -1,7 +1,6 @@
 package com.example.highrestclienttest.controllers;
 
 import com.example.highrestclienttest.service.ElasticSearchService;
-import jdk.nashorn.internal.objects.annotations.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;

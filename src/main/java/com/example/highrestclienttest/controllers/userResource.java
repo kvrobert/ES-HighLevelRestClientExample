@@ -32,10 +32,11 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/rest/users")
+@RequestMapping("/rest")
 public class userResource {
 
     @Autowired
@@ -54,9 +55,17 @@ public class userResource {
      * @throws IOException
      */
     @GetMapping(value = "/authtest")
-    public String authTest(@RequestParam Map<String, String> params,
-                           @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN // MÉG LEHET NULL, de később nem!!!
+    public Object authTest(@RequestParam Map<String, String> params,
+                           @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN, // MÉG LEHET NULL, de később nem!!!
+                           @RequestBody @Nullable final String body
                             ) throws IOException {
+
+        System.out.println("****************  BODY  ***********************************");
+        System.out.println("Req body....: " + body) ;
+        System.out.println("***********************************************************");
+
+        System.out.println("**************** PARAMS ***********************************");
+        params.entrySet().stream().forEach( param -> System.out.println(param.getKey() + " - " + param.getValue()));
 
         params.put("KEYCLOAK_ACCESS_TOKEN", KEYCLOAK_ACCESS_TOKEN);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -64,14 +73,19 @@ public class userResource {
         objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         Object obj = mcfSearchService.simpleSearchTest(params);
 
-        return obj.toString();
-
+        return obj;
         //return new ResponseEntity<>( obj, HttpStatus.OK);
         //return mcfSearchService.simpleSearchTest(params);
-
-
     }
 
+    /** Searching with RNI and parameter based user auth.
+     * RNI as QueryString
+     * AUTH as filter -> does not affect the score
+     * @param q
+     * @param USERS
+     * @return
+     * @throws IOException
+     */
     @GetMapping(value = "/rniauth", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public String rniauth(@RequestParam(value = "q", defaultValue = "*") String q,
                           @RequestParam(value = "u", defaultValue = "empty") final String USERS) throws IOException {
@@ -80,12 +94,44 @@ public class userResource {
         return mcfSearchService.simpleSearchRNI(q, USERS);
     }
 
+    /** Simple query string search with Faceting, for authentication using KEYCLOAK_ACCESS_TOKEN
+     * @param KEYCLOAK_ACCESS_TOKEN
+     * @param body
+     * @return
+     * @throws IOException
+     */
+    @PostMapping(value = "/_search")
+    public Object transparentSearch(
+                                @RequestHeader @Nullable final String KEYCLOAK_ACCESS_TOKEN, // MÉG LEHET NULL, de később nem!!!
+                                @RequestBody @Nullable final String body
+                                ) throws IOException {
+
+        Map<String, String> params = new HashMap<>();
+        params.put("body", body);
+        params.put("KEYCLOAK_ACCESS_TOKEN", KEYCLOAK_ACCESS_TOKEN);
+
+        return mcfSearchService.transparentSearchService(params);
+    }
+
+
+
+
+
+
 
 
 
     /* *********************************************************************************************************** */
     /* *********************************************************************************************************** */
     /* *********************************************************************************************************** */
+
+
+
+
+
+
+
+
 
     @GetMapping("/insert/{name}/{age}/{hobby}")
     public String insert(@PathVariable final String name,
