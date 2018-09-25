@@ -7,6 +7,7 @@ import com.example.highrestclienttest.beans.UIFilterQuery;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.action.search.SearchRequest;
@@ -31,7 +32,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
+@Slf4j
 @Service
 public class MCFSearchService {
 
@@ -49,6 +50,9 @@ public class MCFSearchService {
 
         final String USERNAME_DOMAIN;
 
+        log.debug("Q=" + params.get("q"));
+        log.debug("USER=" + params.get("u"));
+        log.debug("HEADER=" + params.get("KEYCLOAK_ACCESS_TOKEN"));
         System.out.println("Q=" + params.get("q"));
         System.out.println("USER=" + params.get("u"));
         System.out.println("HEADER=" + params.get("KEYCLOAK_ACCESS_TOKEN"));
@@ -257,6 +261,9 @@ public class MCFSearchService {
         final String KEYCLOAK_ACCESS_TOKEN = params.get("KEYCLOAK_ACCESS_TOKEN");
         final String body = params.get("body");
 
+        log.debug("The body:" + body);
+        log.debug("The KEYCLOAK_ACCESS_TOKEN:" + KEYCLOAK_ACCESS_TOKEN);
+
         final String USERNAME_DOMAIN = keycloakService.getUsernameFromJWT(KEYCLOAK_ACCESS_TOKEN);
         final String RNI_FIELD_NAME = "RNI_PERSON";
 
@@ -328,18 +335,6 @@ public class MCFSearchService {
         if(isUsingRnNI){
             queryString.field(RNI_FIELD_NAME);
         }
-
-        System.out.println("========================== PARAMS ======================================");
-        System.out.println();
-        System.out.println("q: " + q);
-        System.out.println("from: " + from);
-        System.out.println("sortField: " + sortField);
-        System.out.println("sortOrdering: " + sortOrderingText);
-        System.out.println("size: " + size);
-        System.out.println("ES-FulteqtQueryFilds: " + configNode.path("elasticParams").path("fullTextQueryFields"));
-        System.out.println("index: " + index);
-        System.out.println();
-        System.out.println("======================================================================");
 
         /* Building filter based on aggregation  */
         BoolQueryBuilder fqQueryFilter = new BoolQueryBuilder();
@@ -429,6 +424,8 @@ public class MCFSearchService {
             searchSourceBuilder.addRescorer(queryRescorer);
         }
 
+        log.debug("Params....: " + paramsNode);
+        log.debug("Config....: " + configNode);
         System.out.println("****************  BODY  ***********************************");
         System.out.println("Params....: " + paramsNode);
         System.out.println("Config....: " + configNode);
