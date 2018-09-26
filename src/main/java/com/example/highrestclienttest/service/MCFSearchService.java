@@ -288,9 +288,13 @@ public class MCFSearchService {
 
         // Reading parameters from UI body parameters
 
+        /* KÜLÖN OBJbe tenni   */
+
         UIFilterQuery uiQueryParams;
         String UiQueryParamsString = paramsNode.toString();
         uiQueryParams = mapper.readValue(UiQueryParamsString, new TypeReference<UIFilterQuery>(){});
+
+
 
         String q = uiQueryParams.q;
         int from = uiQueryParams.start;
@@ -313,6 +317,14 @@ public class MCFSearchService {
             HighlightBuilder highlightBuilder = new HighlightBuilder();
             HighlightBuilder.Field highlightContentText = new HighlightBuilder.Field("content_text");
         }
+//============================================================================
+        /// Ez is egy OBJ lenne....sozály
+
+
+
+
+
+
 
         StringBuffer RNiPersons = new StringBuffer();
         List<String> splitedRNINames = Arrays.asList(q.split(RNI_FIELD_NAME + ":"));
@@ -362,6 +374,9 @@ public class MCFSearchService {
         }
         System.out.println("FQ_kint: " + paramsNode.path("fq").toString());
 
+     //============================================================================
+
+
         searchSourceBuilder.query(QueryBuilders.boolQuery()
                 .must(queryString)
                 .filter(authorizationFilter)
@@ -377,6 +392,9 @@ public class MCFSearchService {
             }
         }
         searchSourceBuilder.size(size);
+
+
+        // Aggregation builder osztály lehetne....
 
         /* Building aggregations  */
         List<String> aggregationsFieldList;
